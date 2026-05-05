@@ -21,7 +21,7 @@ import toast from 'react-hot-toast';
 export default function LoginPage() {
   const router        = useRouter();
   const searchParams  = useSearchParams();
-  const {token } = useAuthStore();
+const { setAuth, token } = useAuthStore();
 
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
@@ -67,6 +67,7 @@ export default function LoginPage() {
     try {
       const { data } = await api.post('/auth/login', { email, password });
       clearTimeout(coldStartTimer);
+      setAuth(data.token, data.user);
       toast.success(`Welcome back, ${data.user?.name?.split(' ')[0] || 'there'}!`);
       const redirect = searchParams?.get('redirect') || '/dashboard';
       router.replace(redirect);
