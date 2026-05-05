@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cerebre — Complete Deployment Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset & Root ──────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --brand:#6d28d9;
+  --brand-light:#ede9fe;
+  --brand-mid:#7c3aed;
+  --green:#059669;
+  --green-light:#d1fae5;
+  --amber:#d97706;
+  --amber-light:#fef3c7;
+  --red:#dc2626;
+  --red-light:#fee2e2;
+  --blue:#2563eb;
+  --blue-light:#dbeafe;
+  --gray-50:#f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-400:#9ca3af;
+  --gray-500:#6b7280;
+  --gray-600:#4b5563;
+  --gray-700:#374151;
+  --gray-800:#1f2937;
+  --gray-900:#111827;
+  --code-bg:#0f172a;
+  --code-text:#e2e8f0;
+}
+
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--gray-50);
+  color:var(--gray-800);
+  line-height:1.6;
+  font-size:15px;
+  min-height:100vh;
+}
+
+/* ─── Layout ────────────────────────────────────────── */
+.page-wrap{display:flex;min-height:100vh}
+
+/* ─── Sidebar ───────────────────────────────────────── */
+.sidebar{
+  width:260px;
+  background:#fff;
+  border-right:1px solid var(--gray-200);
+  position:fixed;
+  top:0;left:0;bottom:0;
+  overflow-y:auto;
+  z-index:100;
+  padding:24px 0 40px;
+}
+.sidebar-logo{
+  padding:0 20px 24px;
+  border-bottom:1px solid var(--gray-100);
+  margin-bottom:16px;
+}
+.logo-mark{
+  display:flex;align-items:center;gap:10px;
+}
+.logo-icon{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,var(--brand),#a78bfa);
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+}
+.logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--gray-900)}
+.logo-sub{font-size:10px;color:var(--gray-400);font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-top:1px}
+
+.nav-section-label{
+  font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--gray-400);
+  padding:12px 20px 6px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 20px;font-size:13px;font-weight:500;
+  color:var(--gray-600);cursor:pointer;
+  transition:all .15s;border-radius:0;
+  text-decoration:none;border-left:3px solid transparent;
+}
+.nav-item:hover{color:var(--brand);background:var(--brand-light);border-left-color:transparent}
+.nav-item.active{color:var(--brand);background:var(--brand-light);border-left-color:var(--brand);font-weight:600}
+.nav-num{
+  width:20px;height:20px;border-radius:50%;
+  background:var(--gray-100);
+  font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--gray-500);flex-shrink:0;
+}
+.nav-item.active .nav-num,.nav-item.done .nav-num{
+  background:var(--green);color:#fff;
+}
+.nav-item.done{color:var(--gray-400)}
+
+.progress-bar-wrap{padding:16px 20px 0;border-top:1px solid var(--gray-100);margin-top:8px}
+.progress-label{font-size:11px;color:var(--gray-500);margin-bottom:6px;display:flex;justify-content:space-between}
+.progress-bar{height:6px;background:var(--gray-100);border-radius:10px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--brand),#a78bfa);border-radius:10px;transition:width .4s ease}
+
+/* ─── Main content ──────────────────────────────────── */
+.main{
+  margin-left:260px;
+  flex:1;
+  max-width:100%;
+}
+
+/* ─── Hero ──────────────────────────────────────────── */
+.hero{
+  background:linear-gradient(135deg,#1e1b4b 0%,#4c1d95 50%,#6d28d9 100%);
+  padding:64px 64px 56px;
+  position:relative;overflow:hidden;
+}
+.hero::before{
+  content:'';position:absolute;top:-80px;right:-80px;
+  width:400px;height:400px;border-radius:50%;
+  background:rgba(167,139,250,.12);
+}
+.hero::after{
+  content:'';position:absolute;bottom:-60px;left:40%;
+  width:300px;height:300px;border-radius:50%;
+  background:rgba(139,92,246,.1);
+}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:30px;padding:5px 14px;
+  font-size:11px;font-weight:600;color:#c4b5fd;
+  text-transform:uppercase;letter-spacing:.08em;
+  margin-bottom:20px;position:relative;z-index:1;
+}
+.hero h1{
+  font-family:'Syne',sans-serif;
+  font-size:40px;font-weight:800;
+  color:#fff;line-height:1.15;
+  margin-bottom:14px;position:relative;z-index:1;
+}
+.hero h1 span{color:#a78bfa}
+.hero p{
+  font-size:16px;color:#c4b5fd;
+  max-width:580px;line-height:1.7;
+  position:relative;z-index:1;
+}
+.hero-stats{
+  display:flex;gap:32px;margin-top:32px;
+  position:relative;z-index:1;flex-wrap:wrap;
+}
+.hero-stat{
+  display:flex;align-items:center;gap:10px;
+}
+.hero-stat-icon{
+  width:36px;height:36px;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+}
+.hero-stat-text strong{display:block;font-size:15px;font-weight:700;color:#fff}
+.hero-stat-text span{font-size:12px;color:#a78bfa}
+
+/* ─── Content area ──────────────────────────────────── */
+.content{padding:0 64px 80px}
+
+/* ─── Section ───────────────────────────────────────── */
+.section{
+  padding-top:48px;
+  border-top:1px solid var(--gray-200);
+  margin-top:48px;
+}
+.section:first-of-type{margin-top:0;border-top:none;padding-top:48px}
+.section-header{
+  display:flex;align-items:flex-start;gap:16px;
+  margin-bottom:32px;
+}
+.section-num{
+  width:44px;height:44px;
+  background:linear-gradient(135deg,var(--brand),#a78bfa);
+  border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;
+  color:#fff;flex-shrink:0;
+  box-shadow:0 4px 12px rgba(109,40,217,.3);
+}
+.section-num.done{background:linear-gradient(135deg,#059669,#10b981)}
+.section-title-block h2{
+  font-family:'Syne',sans-serif;
+  font-size:24px;font-weight:800;color:var(--gray-900);
+  line-height:1.2;
+}
+.section-title-block p{
+  font-size:14px;color:var(--gray-500);margin-top:4px;
+}
+
+/* ─── Service cards ─────────────────────────────────── */
+.service-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+.service-card{
+  background:#fff;border:1px solid var(--gray-200);
+  border-radius:14px;padding:20px;
+  transition:all .2s;
+}
+.service-card:hover{border-color:var(--brand);box-shadow:0 4px 16px rgba(109,40,217,.1)}
+.service-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.service-icon{font-size:24px}
+.service-badge{
+  font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.06em;padding:3px 8px;border-radius:20px;
+}
+.badge-free{background:var(--green-light);color:var(--green)}
+.badge-cost{background:var(--amber-light);color:var(--amber)}
+.service-card h4{font-size:14px;font-weight:700;color:var(--gray-900);margin-bottom:4px}
+.service-card p{font-size:12px;color:var(--gray-500);line-height:1.5}
+.service-url{
+  font-size:11px;color:var(--brand);font-weight:600;
+  margin-top:8px;display:flex;align-items:center;gap:4px;
+  text-decoration:none;
+}
+.service-url:hover{text-decoration:underline}
+
+/* ─── Step cards ────────────────────────────────────── */
+.steps{display:flex;flex-direction:column;gap:20px}
+.step-card{
+  background:#fff;border:1px solid var(--gray-200);
+  border-radius:14px;overflow:hidden;
+}
+.step-card-head{
+  display:flex;align-items:flex-start;gap:14px;
+  padding:20px 20px 16px;
+}
+.step-circle{
+  width:30px;height:30px;border-radius:50%;
+  background:var(--brand-light);border:2px solid var(--brand);
+  color:var(--brand);font-size:13px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.step-card-head h3{
+  font-size:15px;font-weight:700;color:var(--gray-900);
+  margin-bottom:4px;
+}
+.step-card-head p{font-size:13px;color:var(--gray-500);line-height:1.5}
+.step-card-body{padding:0 20px 20px 64px}
+
+/* ─── Code blocks ───────────────────────────────────── */
+.code-wrap{position:relative;margin:10px 0}
+.code-label{
+  font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--gray-400);
+  margin-bottom:4px;font-family:'Inter',sans-serif;
+}
+pre,.code{
+  background:var(--code-bg);color:var(--code-text);
+  padding:14px 16px;border-radius:10px;
+  font-family:'DM Mono','Fira Code',monospace;
+  font-size:12.5px;line-height:1.8;
+  overflow-x:auto;position:relative;
+}
+.copy-btn{
+  position:absolute;top:10px;right:10px;
+  background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.15);
+  color:#94a3b8;font-size:11px;
+  font-family:'Inter',sans-serif;font-weight:500;
+  padding:4px 10px;border-radius:6px;
+  cursor:pointer;transition:all .15s;
+}
+.copy-btn:hover{background:rgba(255,255,255,.18);color:#e2e8f0}
+.copy-btn.copied{background:rgba(16,185,129,.2);color:#6ee7b7;border-color:rgba(16,185,129,.3)}
+
+/* Code colours */
+.c{color:#64748b}  /* comment */
+.k{color:#7dd3fc}  /* key */
+.v{color:#86efac}  /* value */
+.cmd{color:#fbbf24}  /* command */
+.url{color:#c084fc}  /* url */
+.hi{color:#f472b6}   /* highlight */
+
+/* ─── Env table ─────────────────────────────────────── */
+.env-table{
+  width:100%;border-collapse:collapse;
+  font-size:12.5px;margin:12px 0;
+  border-radius:10px;overflow:hidden;
+  border:1px solid var(--gray-200);
+}
+.env-table th{
+  background:var(--gray-50);padding:10px 14px;
+  text-align:left;font-size:10px;font-weight:700;
+  color:var(--gray-500);text-transform:uppercase;
+  letter-spacing:.06em;border-bottom:1px solid var(--gray-200);
+}
+.env-table td{
+  padding:10px 14px;border-bottom:1px solid var(--gray-100);
+  vertical-align:top;
+}
+.env-table tr:last-child td{border-bottom:none}
+.env-table tr:hover td{background:var(--gray-50)}
+.env-table td:first-child{
+  font-family:'DM Mono',monospace;font-size:11.5px;
+  color:var(--brand);font-weight:500;white-space:nowrap;
+}
+.env-table td:nth-child(2){color:var(--gray-700);line-height:1.5}
+.env-table td:last-child{white-space:nowrap}
+.req{
+  font-size:10px;font-weight:700;
+  background:var(--red-light);color:var(--red);
+  padding:2px 6px;border-radius:4px;
+}
+.opt{
+  font-size:10px;font-weight:600;
+  background:var(--gray-100);color:var(--gray-500);
+  padding:2px 6px;border-radius:4px;
+}
+.later{
+  font-size:10px;font-weight:600;
+  background:var(--amber-light);color:var(--amber);
+  padding:2px 6px;border-radius:4px;
+}
+
+/* ─── Callout ───────────────────────────────────────── */
+.callout{
+  border-radius:10px;padding:14px 16px;
+  font-size:13px;line-height:1.6;
+  margin:12px 0;display:flex;gap:12px;align-items:flex-start;
+}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.info{background:var(--blue-light);border:1px solid #bfdbfe;color:#1e40af}
+.success{background:var(--green-light);border:1px solid #a7f3d0;color:#065f46}
+.warn{background:var(--amber-light);border:1px solid #fde68a;color:#92400e}
+.danger{background:var(--red-light);border:1px solid #fecaca;color:#991b1b}
+.tip{background:var(--brand-light);border:1px solid #ddd6fe;color:#4c1d95}
+
+/* ─── Architecture diagram ──────────────────────────── */
+.arch{
+  background:var(--code-bg);border-radius:14px;
+  padding:24px 28px;font-family:'DM Mono',monospace;
+  font-size:12px;color:#94a3b8;line-height:2.2;
+  margin:16px 0;
+}
+.arch .label{color:#e2e8f0;font-weight:700}
+.arch .vercel{color:#60a5fa}
+.arch .railway{color:#a78bfa}
+.arch .supabase{color:#34d399}
+.arch .upstash{color:#fb923c}
+.arch .r2{color:#fbbf24}
+.arch .arrow{color:#374151}
+
+/* ─── Final checklist ───────────────────────────────── */
+.checklist{list-style:none}
+.check-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 0;border-bottom:1px solid var(--gray-100);
+  font-size:14px;color:var(--gray-700);
+}
+.check-item:last-child{border-bottom:none}
+.check-box{
+  width:22px;height:22px;flex-shrink:0;
+  border:2px solid var(--gray-300);
+  border-radius:6px;cursor:pointer;
+  transition:all .2s;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;background:#fff;
+}
+.check-box:hover{border-color:var(--brand)}
+.check-box.checked{
+  background:var(--green);border-color:var(--green);
+  color:#fff;
+}
+.check-item.checked-row .check-label{
+  text-decoration:line-through;color:var(--gray-400);
+}
+.check-label{flex:1;line-height:1.5}
+
+/* ─── Troubleshoot ──────────────────────────────────── */
+.trouble-item{
+  border:1px solid var(--gray-200);border-radius:12px;
+  overflow:hidden;margin-bottom:10px;
+}
+.trouble-head{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 18px;cursor:pointer;
+  background:#fff;
+}
+.trouble-head:hover{background:var(--gray-50)}
+.trouble-icon{
+  width:28px;height:28px;border-radius:8px;
+  background:var(--red-light);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
+.trouble-head h4{font-size:14px;font-weight:600;color:var(--gray-800);flex:1}
+.trouble-arrow{
+  font-size:12px;color:var(--gray-400);
+  transition:transform .2s;
+}
+.trouble-body{
+  padding:0 18px 16px 58px;
+  border-top:1px solid var(--gray-100);
+  display:none;
+}
+.trouble-item.open .trouble-arrow{transform:rotate(90deg)}
+.trouble-item.open .trouble-body{display:block}
+
+/* ─── Responsive ────────────────────────────────────── */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .main{margin-left:0}
+  .hero{padding:40px 24px 36px}
+  .hero h1{font-size:28px}
+  .content{padding:0 24px 60px}
+  .service-grid{grid-template-columns:1fr}
+  .step-card-body{padding-left:20px}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+<!-- ─── SIDEBAR ──────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="logo-text">Cerebre</div>
+        <div class="logo-sub">Deployment Guide</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-section-label">Before you start</div>
+  <a class="nav-item" href="#overview" onclick="setActive(this)">
+    <span class="nav-num">✦</span> Overview & architecture
+  </a>
+  <a class="nav-item" href="#prerequisites" onclick="setActive(this)">
+    <span class="nav-num">0</span> What you need first
+  </a>
+
+  <div class="nav-section-label">Deploy services</div>
+  <a class="nav-item" href="#step1" onclick="setActive(this)">
+    <span class="nav-num">1</span> GitHub — upload code
+  </a>
+  <a class="nav-item" href="#step2" onclick="setActive(this)">
+    <span class="nav-num">2</span> Supabase — database
+  </a>
+  <a class="nav-item" href="#step3" onclick="setActive(this)">
+    <span class="nav-num">3</span> Upstash — Redis
+  </a>
+  <a class="nav-item" href="#step4" onclick="setActive(this)">
+    <span class="nav-num">4</span> Cloudflare R2 — file storage
+  </a>
+  <a class="nav-item" href="#step5" onclick="setActive(this)">
+    <span class="nav-num">5</span> Anthropic — AI key
+  </a>
+  <a class="nav-item" href="#step6" onclick="setActive(this)">
+    <span class="nav-num">6</span> Railway — backend API
+  </a>
+  <a class="nav-item" href="#step7" onclick="setActive(this)">
+    <span class="nav-num">7</span> Railway — worker process
+  </a>
+  <a class="nav-item" href="#step8" onclick="setActive(this)">
+    <span class="nav-num">8</span> Vercel — frontend website
+  </a>
+  <a class="nav-item" href="#step9" onclick="setActive(this)">
+    <span class="nav-num">9</span> Connect everything
+  </a>
+  <a class="nav-item" href="#step10" onclick="setActive(this)">
+    <span class="nav-num">10</span> Database setup & seed
+  </a>
+
+  <div class="nav-section-label">Finish</div>
+  <a class="nav-item" href="#checklist" onclick="setActive(this)">
+    <span class="nav-num">✓</span> Final checklist
+  </a>
+  <a class="nav-item" href="#troubleshoot" onclick="setActive(this)">
+    <span class="nav-num">?</span> Troubleshooting
+  </a>
+  <a class="nav-item" href="#whats-next" onclick="setActive(this)">
+    <span class="nav-num">→</span> What to do next
+  </a>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-label">
+      <span>Progress</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ─── MAIN ─────────────────────────────────────────── -->
+<main class="main">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">⚡ Deployment Guide v1.0</div>
+  <h1>Deploy Cerebre<br><span>Intelligence Platform</span></h1>
+  <p>Follow this guide from top to bottom. Each step is written for someone who has never deployed a web app before. Copy exactly what is shown — no guessing required.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-icon">⏱</div>
+      <div class="hero-stat-text"><strong>45–60 min</strong><span>Total setup time</span></div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-icon">💰</div>
+      <div class="hero-stat-text"><strong>₦0 to start</strong><span>All free tier services</span></div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-icon">🌐</div>
+      <div class="hero-stat-text"><strong>5 services</strong><span>All free tier available</span></div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-icon">📋</div>
+      <div class="hero-stat-text"><strong>10 steps</strong><span>Clear, numbered instructions</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- OVERVIEW -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="overview">
+  <div class="section-header">
+    <div class="section-num">🗺</div>
+    <div class="section-title-block">
+      <h2>How everything connects</h2>
+      <p>Read this first — it explains what each service does before you create any accounts</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <span class="callout-icon">💡</span>
+    <div>
+      <strong>Why you need 5 separate services:</strong> Cerebre is a full-stack application with a website, an API server, a background worker, a database, a file store, and a job queue. No single hosting provider does all of this well for free. Each service below is the best free option for its specific job.
+    </div>
+  </div>
+
+  <div class="arch">
+    <span class="label">HOW THE 5 SERVICES FIT TOGETHER</span><br><br>
+    <span class="arrow">👤</span> Your team visits the website<br>
+    <span class="arrow">         │</span><br>
+    <span class="arrow">         ▼</span><br>
+    <span class="vercel">🔷 VERCEL (free)  ←  The website your team uses (Next.js)</span><br>
+    <span class="arrow">         │  sends data to ↓</span><br>
+    <span class="arrow">         ▼</span><br>
+    <span class="railway">🟣 RAILWAY (free tier)  ←  The engine: Express API + background worker</span><br>
+    <span class="arrow">         │  uses ↓</span><br>
+    <span class="arrow">    ┌────┴────────────────────┐</span><br>
+    <span class="arrow">    ▼                         ▼</span><br>
+    <span class="supabase">🟢 SUPABASE (free)  </span><span class="upstash">   🟠 UPSTASH (free)</span><br>
+    <span class="arrow">   Database                  Job queue</span><br>
+    <span class="arrow">   (users, reports,           (processes files</span><br>
+    <span class="arrow">    metrics, goals)            in background)</span><br><br>
+    <span class="r2">🟡 CLOUDFLARE R2 (free 10GB)  ←  Stores uploaded PDF/image files</span>
+  </div>
+
+  <div class="service-grid">
+    <div class="service-card">
+      <div class="service-card-head">
+        <span class="service-icon">🔷</span>
+        <span class="service-badge badge-free">Free</span>
+      </div>
+      <h4>Vercel</h4>
+      <p>Hosts your Next.js website. Auto-deploys whenever you push code to GitHub. Your users go here.</p>
+      <a class="service-url" href="https://vercel.com" target="_blank">→ vercel.com</a>
+    </div>
+    <div class="service-card">
+      <div class="service-card-head">
+        <span class="service-icon">🟣</span>
+        <span class="service-badge badge-free">Free tier</span>
+      </div>
+      <h4>Railway</h4>
+      <p>Runs your Express API server and the background worker that processes uploaded reports. Always on.</p>
+      <a class="service-url" href="https://railway.app" target="_blank">→ railway.app</a>
+    </div>
+    <div class="service-card">
+      <div class="service-card-head">
+        <span class="service-icon">🟢</span>
+        <span class="service-badge badge-free">Free</span>
+      </div>
+      <h4>Supabase</h4>
+      <p>Managed PostgreSQL database. Stores all users, reports, metrics, goals, and analysis results.</p>
+      <a class="service-url" href="https://supabase.com" target="_blank">→ supabase.com</a>
+    </div>
+    <div class="service-card">
+      <div class="service-card-head">
+        <span class="service-icon">🟠</span>
+        <span class="service-badge badge-free">Free</span>
+      </div>
+      <h4>Upstash Redis</h4>
+      <p>Serverless Redis database. Manages the queue of uploaded files waiting to be processed by AI.</p>
+      <a class="service-url" href="https://upstash.com" target="_blank">→ upstash.com</a>
+    </div>
+    <div class="service-card">
+      <div class="service-card-head">
+        <span class="service-icon">🟡</span>
+        <span class="service-badge badge-free">Free (10GB)</span>
+      </div>
+      <h4>Cloudflare R2</h4>
+      <p>Object storage for uploaded PDFs and images. Like Google Drive for your app's files. 10GB free.</p>
+      <a class="service-url" href="https://cloudflare.com" target="_blank">→ cloudflare.com</a>
+    </div>
+    <div class="service-card">
+      <div class="service-card-head">
+        <span class="service-icon">🤖</span>
+        <span class="service-badge badge-cost">Pay per use</span>
+      </div>
+      <h4>Anthropic Claude</h4>
+      <p>The AI that reads reports and writes the analysis. Very low cost — new accounts get free credits.</p>
+      <a class="service-url" href="https://console.anthropic.com" target="_blank">→ console.anthropic.com</a>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- PREREQUISITES -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="prerequisites">
+  <div class="section-header">
+    <div class="section-num">0</div>
+    <div class="section-title-block">
+      <h2>Before you start — 3 things to prepare</h2>
+      <p>Get these ready before creating any accounts — it will save you time</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div>
+          <h3>Get your Anthropic API key</h3>
+          <p>This powers the AI analysis. Without it, Cerebre cannot generate reports.</p>
+        </div>
+      </div>
+      <div class="step-card-body">
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>New Anthropic accounts receive free credits — enough to run dozens of analyses before you pay anything.</span>
+        </div>
+        <ol style="font-size:13px;color:var(--gray-600);margin:10px 0 0 16px;line-height:2.2">
+          <li>Go to <a href="https://console.anthropic.com" target="_blank" style="color:var(--brand)">console.anthropic.com</a></li>
+          <li>Click <strong>Sign up</strong> and create an account</li>
+          <li>After logging in, click <strong>API Keys</strong> in the left menu</li>
+          <li>Click <strong>Create Key</strong> — name it <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-production</code></li>
+          <li>Copy the key immediately — it starts with <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">sk-ant-api03-...</code></li>
+        </ol>
+        <div class="callout warn" style="margin-top:10px">
+          <span class="callout-icon">⚠</span>
+          <span><strong>The key is only shown once.</strong> Save it in a text file on your computer right now.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div>
+          <h3>Create a GitHub account and upload your code</h3>
+          <p>Railway and Vercel deploy directly from GitHub — you need the code there first.</p>
+        </div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 0 16px;line-height:2.2">
+          <li>Go to <a href="https://github.com" target="_blank" style="color:var(--brand)">github.com</a> → Sign up (free)</li>
+          <li>Click the <strong>+</strong> icon at the top right → <strong>New repository</strong></li>
+          <li>Name it <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-media</code> → Leave everything else as default → <strong>Create repository</strong></li>
+          <li>On the next page, click <strong>uploading an existing file</strong></li>
+          <li>Drag your entire <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-media</code> project folder into the upload area</li>
+          <li>Scroll down, click <strong>Commit changes</strong></li>
+        </ol>
+        <div class="callout success" style="margin-top:10px">
+          <span class="callout-icon">✓</span>
+          <span>When you can see all your project files listed on github.com/yourusername/cerebre-media — you are ready.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">3</div>
+        <div>
+          <h3>Open a text file to save credentials as you go</h3>
+          <p>You will collect 12 values across the next steps. Keep them in one place.</p>
+        </div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:10px">Open Notepad (Windows) or TextEdit (Mac) and paste this template — fill it in as you go:</p>
+        <div class="code-wrap">
+          <pre><span class="c"># ─── MY CEREBRE CREDENTIALS ─────────────────────────</span>
+<span class="c"># Fill these in as you complete each step</span>
+
+<span class="k">ANTHROPIC_API_KEY</span>=<span class="v">sk-ant-api03-...</span>        <span class="c"># Step 5</span>
+<span class="k">DATABASE_URL</span>=<span class="v">postgresql://...</span>              <span class="c"># Step 2</span>
+<span class="k">REDIS_URL</span>=<span class="v">rediss://...</span>                     <span class="c"># Step 3</span>
+<span class="k">AWS_ACCESS_KEY_ID</span>=<span class="v">...</span>                      <span class="c"># Step 4</span>
+<span class="k">AWS_SECRET_ACCESS_KEY</span>=<span class="v">...</span>                  <span class="c"># Step 4</span>
+<span class="k">S3_ENDPOINT</span>=<span class="v">https://....r2.cloudflarestorage.com</span> <span class="c"># Step 4</span>
+<span class="k">JWT_SECRET</span>=<span class="v">make-up-a-long-random-password</span>  <span class="c"># You decide</span>
+<span class="k">RAILWAY_API_URL</span>=<span class="v">https://....up.railway.app</span>  <span class="c"># Step 6</span>
+<span class="k">VERCEL_URL</span>=<span class="v">https://....vercel.app</span>           <span class="c"># Step 8</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 1: GITHUB -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step1">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <div class="section-title-block">
+      <h2>GitHub — your code is already here</h2>
+      <p>If you uploaded your code in Prerequisite Step 2, you can skip this section</p>
+    </div>
+  </div>
+  <div class="callout success">
+    <span class="callout-icon">✓</span>
+    <span>If you completed Prerequisite Step 2 and can see your files at <strong>github.com/[your-username]/cerebre-media</strong>, you are done with this step. Move to Step 2.</span>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 2: SUPABASE -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step2">
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <div class="section-title-block">
+      <h2>Supabase — create your database</h2>
+      <p>Where all your data lives: users, reports, metrics, goals, analysis results — estimated time: 10 minutes</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Sign up at supabase.com</h3><p>Go to supabase.com → click <strong>Start your project</strong> → sign up with your GitHub account (easiest option)</p></div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Create a new project</h3><p>Click <strong>New project</strong>. Fill in the form exactly as shown below.</p></div>
+      </div>
+      <div class="step-card-body">
+        <table class="env-table">
+          <tr><th>Field</th><th>What to enter</th></tr>
+          <tr><td>Name</td><td>cerebre-media</td></tr>
+          <tr><td>Database Password</td><td>Create a strong password — mix of letters, numbers, symbols. <strong>Save it to your credentials file now.</strong></td></tr>
+          <tr><td>Region</td><td>Choose <strong>West EU (Ireland)</strong> or <strong>East US (N. Virginia)</strong> — whichever is closer to Nigeria</td></tr>
+        </table>
+        <p style="font-size:13px;color:var(--gray-500);margin-top:8px">Click <strong>Create new project</strong>. Wait 2–3 minutes for the green "Project is ready" message.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">3</div>
+        <div><h3>Get your DATABASE_URL</h3><p>This is the connection string your app will use to talk to the database.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>In your Supabase project, click <strong>Settings</strong> (gear icon, bottom-left)</li>
+          <li>Click <strong>Database</strong> in the left menu</li>
+          <li>Scroll down to the section called <strong>"Connection string"</strong></li>
+          <li>Click the <strong>URI</strong> tab</li>
+          <li>Click the <strong>copy icon</strong> to copy the full connection string</li>
+        </ol>
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>The URL will look like this — the <code>[YOUR-PASSWORD]</code> part will actually be the password you set in Step 2:</span>
+        </div>
+        <div class="code-wrap">
+          <pre><span class="v">postgresql://postgres:[YOUR-PASSWORD]@db.abcdefgh.supabase.co:5432/postgres</span>
+
+<span class="c"># Replace [YOUR-PASSWORD] with the actual password you created.</span>
+<span class="c"># Save this full URL as DATABASE_URL in your credentials file.</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">4</div>
+        <div><h3>Run the database schema</h3><p>This creates all the tables (users, reports, metrics, etc.) in your new database.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>In Supabase, click <strong>SQL Editor</strong> in the left menu</li>
+          <li>Click the <strong>New query</strong> button</li>
+          <li>On your computer, open the file <code style="background:var(--gray-100);padding:1px 4px;border-radius:4px;font-family:monospace;font-size:11px">cerebre-media/backend/src/db/schema.sql</code></li>
+          <li>Select ALL the text in that file (Ctrl+A or Cmd+A) and copy it</li>
+          <li>Paste it into the Supabase SQL editor</li>
+          <li>Click the green <strong>Run</strong> button</li>
+        </ol>
+        <div class="callout success">
+          <span class="callout-icon">✓</span>
+          <span>You should see <strong>"Success. No rows returned"</strong> — this means all tables were created. You are done with Supabase.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 3: UPSTASH -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step3">
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <div class="section-title-block">
+      <h2>Upstash — create your Redis job queue</h2>
+      <p>This manages the queue of files waiting to be processed by the AI — estimated time: 5 minutes</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Sign up at upstash.com</h3><p>Go to <a href="https://upstash.com" target="_blank" style="color:var(--brand)">upstash.com</a> → click <strong>Sign up</strong> → use <strong>Continue with GitHub</strong> for speed</p></div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Create a Redis database</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>After logging in, click <strong>Create database</strong></li>
+          <li>Name: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-queue</code></li>
+          <li>Type: <strong>Regional</strong></li>
+          <li>Region: Choose closest to Nigeria — either <strong>EU-West-1</strong> or <strong>US-East-1</strong></li>
+          <li>Click <strong>Create</strong></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">3</div>
+        <div><h3>Get your REDIS_URL</h3><p>After the database is created, you need the connection URL.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Click on your new database name</li>
+          <li>Scroll down to the <strong>Details</strong> section</li>
+          <li>Find the field called <strong>Endpoint</strong> and note the URL</li>
+          <li>Find the field called <strong>Password</strong> and click the eye icon to reveal it</li>
+        </ol>
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">Your REDIS_URL is built like this:</p>
+        <div class="code-wrap">
+          <pre><span class="c"># Your REDIS_URL format:</span>
+<span class="k">REDIS_URL</span>=<span class="v">rediss://default:[PASSWORD]@[ENDPOINT]:6379</span>
+
+<span class="c"># Example (yours will have different values):</span>
+<span class="v">rediss://default:AbCdEfGhIj123@pleased-porpoise-12345.upstash.io:6379</span>
+
+<span class="c"># Save this as REDIS_URL in your credentials file.</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <span>Note the <strong>rediss://</strong> prefix (with double s) — this means secure Redis with TLS encryption. This is correct.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 4: CLOUDFLARE R2 -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step4">
+  <div class="section-header">
+    <div class="section-num">4</div>
+    <div class="section-title-block">
+      <h2>Cloudflare R2 — file storage</h2>
+      <p>Stores the uploaded PDF and image files — 10GB free — estimated time: 8 minutes</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Sign up at cloudflare.com</h3><p>Go to <a href="https://cloudflare.com" target="_blank" style="color:var(--brand)">cloudflare.com</a> → click <strong>Sign up</strong> → create a free account</p></div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Enable R2 storage</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>In the Cloudflare dashboard, click <strong>R2</strong> in the left sidebar</li>
+          <li>You will be asked to add a payment method to enable R2. <strong>You will not be charged</strong> unless you exceed 10GB of storage or 10 million requests per month — this application will not come close to either limit when starting out</li>
+          <li>Add a card and enable R2</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">3</div>
+        <div><h3>Create a bucket</h3><p>A bucket is like a folder that holds all the uploaded files.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Click <strong>Create bucket</strong></li>
+          <li>Bucket name: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-media-files</code></li>
+          <li>Leave all other settings as default</li>
+          <li>Click <strong>Create bucket</strong></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">4</div>
+        <div><h3>Get your Account ID and create API tokens</h3><p>This is the most important step for file storage — you need 3 values.</p></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:12px"><strong>First: get your Account ID</strong></p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 12px 16px;line-height:2.2">
+          <li>Look at the URL in your browser — it will be: <br><code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px">dash.cloudflare.com/[ACCOUNT-ID]/r2/...</code></li>
+          <li>Copy the <strong>Account ID</strong> (long string of letters and numbers)</li>
+          <li>Your <strong>S3_ENDPOINT</strong> is: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px">https://[ACCOUNT-ID].r2.cloudflarestorage.com</code></li>
+        </ol>
+
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:12px"><strong>Then: create API tokens</strong></p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Click <strong>Manage R2 API tokens</strong> (top-right area on the R2 page)</li>
+          <li>Click <strong>Create API token</strong></li>
+          <li>Name: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-backend</code></li>
+          <li>Under <strong>Permissions</strong>, select <strong>Object Read and Write</strong></li>
+          <li>Click <strong>Create API Token</strong></li>
+        </ol>
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <span>The <strong>Secret Access Key</strong> is shown ONCE. Copy it immediately. If you miss it, you have to delete the token and create a new one.</span>
+        </div>
+        <div class="code-wrap" style="margin-top:10px">
+          <pre><span class="c"># Save these 3 values to your credentials file:</span>
+<span class="k">AWS_ACCESS_KEY_ID</span>     = <span class="v">the "Access Key ID" shown on the page</span>
+<span class="k">AWS_SECRET_ACCESS_KEY</span> = <span class="v">the "Secret Access Key" shown (ONCE only)</span>
+<span class="k">S3_ENDPOINT</span>           = <span class="v">https://[YOUR-ACCOUNT-ID].r2.cloudflarestorage.com</span>
+<span class="k">S3_BUCKET_NAME</span>        = <span class="v">cerebre-media-files</span>
+<span class="k">AWS_REGION</span>            = <span class="v">auto</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 5: ANTHROPIC -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step5">
+  <div class="section-header">
+    <div class="section-num">5</div>
+    <div class="section-title-block">
+      <h2>Anthropic — your AI API key</h2>
+      <p>If you already got your API key in Prerequisite Step 1, just confirm you have it saved</p>
+    </div>
+  </div>
+  <div class="callout success">
+    <span class="callout-icon">✓</span>
+    <span>Your key looks like: <code style="background:var(--green-light);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">sk-ant-api03-XXXXXXXXXXXXXXXXXX</code>. If you have it saved — you are done with this step.</span>
+  </div>
+  <div class="callout info" style="margin-top:10px">
+    <span class="callout-icon">ℹ</span>
+    <span>If you haven't got it yet: <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a> → Log in → API Keys → Create Key → Copy it immediately</span>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 6: RAILWAY API -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step6">
+  <div class="section-header">
+    <div class="section-num">6</div>
+    <div class="section-title-block">
+      <h2>Railway — deploy the API server</h2>
+      <p>This is the backend engine that runs your Express API — the most detailed step, take it slowly — estimated time: 15 minutes</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Sign up at railway.app</h3><p>Go to <a href="https://railway.app" target="_blank" style="color:var(--brand)">railway.app</a> → click <strong>Login</strong> → <strong>Login with GitHub</strong></p></div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Create a new project from your GitHub repository</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Click <strong>New Project</strong></li>
+          <li>Click <strong>Deploy from GitHub repo</strong></li>
+          <li>If prompted, click <strong>Configure GitHub App</strong> and give Railway access to your repositories</li>
+          <li>Find <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-media</code> in the list and click it</li>
+          <li>Railway will ask what to deploy — click <strong>Add service</strong> at the top of the page</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">3</div>
+        <div><h3>Configure the API service settings</h3><p>Click on the service → click <strong>Settings</strong> tab</p></div>
+      </div>
+      <div class="step-card-body">
+        <table class="env-table">
+          <tr><th>Setting</th><th>What to enter</th></tr>
+          <tr><td>Root Directory</td><td>Type: <code style="font-family:monospace;font-size:12px">backend</code></td></tr>
+          <tr><td>Start Command</td><td>Type: <code style="font-family:monospace;font-size:12px">node src/server.js</code></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">4</div>
+        <div><h3>Add all environment variables</h3><p>Click the <strong>Variables</strong> tab. Add each row below one by one. Click <strong>New Variable</strong>, paste the name, paste the value, click <strong>Add</strong>.</p></div>
+      </div>
+      <div class="step-card-body">
+        <table class="env-table">
+          <thead>
+            <tr><th>Variable name (copy exactly)</th><th>Value to paste</th><th>Required?</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>NODE_ENV</td><td>Type the word: <code style="font-family:monospace;font-size:12px">production</code></td><td><span class="req">YES</span></td></tr>
+            <tr><td>PORT</td><td>Type: <code style="font-family:monospace;font-size:12px">4000</code></td><td><span class="req">YES</span></td></tr>
+            <tr><td>DATABASE_URL</td><td>Paste the full PostgreSQL URL from <strong>Step 2</strong> (starts with postgresql://)</td><td><span class="req">YES</span></td></tr>
+            <tr><td>REDIS_URL</td><td>Paste the Redis URL from <strong>Step 3</strong> (starts with rediss://)</td><td><span class="req">YES</span></td></tr>
+            <tr><td>JWT_SECRET</td><td>Make up a random password — minimum 40 characters. Mix letters, numbers, symbols. Example: <code style="font-family:monospace;font-size:11px">CeRebre2025!XkP9mNvQ3...abc</code></td><td><span class="req">YES</span></td></tr>
+            <tr><td>ANTHROPIC_API_KEY</td><td>Paste your Anthropic key from <strong>Step 5</strong> (starts with sk-ant-api03-)</td><td><span class="req">YES</span></td></tr>
+            <tr><td>AWS_ACCESS_KEY_ID</td><td>Paste the Access Key ID from <strong>Step 4</strong></td><td><span class="req">YES</span></td></tr>
+            <tr><td>AWS_SECRET_ACCESS_KEY</td><td>Paste the Secret Access Key from <strong>Step 4</strong></td><td><span class="req">YES</span></td></tr>
+            <tr><td>S3_BUCKET_NAME</td><td>Type: <code style="font-family:monospace;font-size:12px">cerebre-media-files</code></td><td><span class="req">YES</span></td></tr>
+            <tr><td>S3_ENDPOINT</td><td>Paste the R2 endpoint from <strong>Step 4</strong> (starts with https://)</td><td><span class="req">YES</span></td></tr>
+            <tr><td>AWS_REGION</td><td>Type: <code style="font-family:monospace;font-size:12px">auto</code></td><td><span class="req">YES</span></td></tr>
+            <tr><td>FRONTEND_URL</td><td>Leave blank for now — you will come back and add this after Step 8</td><td><span class="later">Add later</span></td></tr>
+            <tr><td>JWT_EXPIRES_IN</td><td>Type: <code style="font-family:monospace;font-size:12px">7d</code></td><td><span class="opt">optional</span></td></tr>
+            <tr><td>MAX_FILE_SIZE_MB</td><td>Type: <code style="font-family:monospace;font-size:12px">50</code></td><td><span class="opt">optional</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">5</div>
+        <div><h3>Deploy and get your API URL</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Click <strong>Deploy</strong> at the top of the page. Railway will build your backend — this takes 3–5 minutes</li>
+          <li>Wait for the status to show <strong>Active</strong> (green dot)</li>
+          <li>Click on the service → <strong>Settings</strong> → scroll to <strong>Domains</strong></li>
+          <li>Click <strong>Generate Domain</strong></li>
+          <li>You will get a URL like: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px">cerebre-media-production.up.railway.app</code></li>
+        </ol>
+        <div class="callout success">
+          <span class="callout-icon">✓</span>
+          <span><strong>Test it works:</strong> Open a browser and go to <code style="background:var(--green-light);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">https://[your-railway-url]/health</code>. You should see JSON with <code>{"status":"ok"}</code>. If you see this — your API is running.</span>
+        </div>
+        <div class="code-wrap" style="margin-top:10px">
+          <pre><span class="c"># Save your Railway URL to your credentials file:</span>
+<span class="k">RAILWAY_API_URL</span>=<span class="v">https://cerebre-media-production.up.railway.app</span>
+<span class="c"># Replace with YOUR actual Railway URL</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 7: RAILWAY WORKER -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step7">
+  <div class="section-header">
+    <div class="section-num">7</div>
+    <div class="section-title-block">
+      <h2>Railway — deploy the background worker</h2>
+      <p>The worker processes uploaded files, runs OCR, and triggers AI analysis — it runs silently in the background — estimated time: 5 minutes</p>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ</span>
+    <span>The worker is a <strong>second service</strong> from the same GitHub repository. It does not have a public URL — it just runs in the background consuming jobs from the queue.</span>
+  </div>
+
+  <div class="steps" style="margin-top:20px">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Add a second service from the same repository</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>In Railway, you should still be in your project. If not, open it</li>
+          <li>Click <strong>+ New</strong> (top-right) → <strong>GitHub Repo</strong></li>
+          <li>Select the same <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-media</code> repository</li>
+          <li>This creates a second service in the same project</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Configure the worker settings</h3></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:10px">Click on the new service → click <strong>Settings</strong> tab:</p>
+        <table class="env-table">
+          <tr><th>Setting</th><th>What to enter</th></tr>
+          <tr><td>Root Directory</td><td>Type: <code style="font-family:monospace;font-size:12px">backend</code></td></tr>
+          <tr><td>Start Command</td><td>Type: <code style="font-family:monospace;font-size:12px">node src/workers/processor.js</code></td></tr>
+        </table>
+        <p style="font-size:13px;color:var(--gray-500);margin-top:10px">Click <strong>Variables</strong> and add the <strong>same environment variables as Step 6</strong>. The worker needs access to the same database, Redis, and storage. You can copy-paste the same values.</p>
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <span>Do <strong>not</strong> click "Generate Domain" for the worker. It does not need a public URL. It only reads from the job queue.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 8: VERCEL -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step8">
+  <div class="section-header">
+    <div class="section-num">8</div>
+    <div class="section-title-block">
+      <h2>Vercel — deploy the website</h2>
+      <p>The website your team will use every day — estimated time: 5 minutes</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Sign up at vercel.com</h3><p>Go to <a href="https://vercel.com" target="_blank" style="color:var(--brand)">vercel.com</a> → click <strong>Sign up</strong> → <strong>Continue with GitHub</strong></p></div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Import your project</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Click <strong>Add New...</strong> → <strong>Project</strong></li>
+          <li>Find your <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">cerebre-media</code> repository</li>
+          <li>Click <strong>Import</strong></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">3</div>
+        <div><h3>Configure project settings — this is important</h3></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:12px">On the configuration screen, change these settings before deploying:</p>
+        <table class="env-table">
+          <tr><th>Setting</th><th>What to do</th></tr>
+          <tr><td>Framework Preset</td><td>Should auto-detect as <strong>Next.js</strong>. If not, select it.</td></tr>
+          <tr><td>Root Directory</td><td>Click <strong>Edit</strong> → type <code style="font-family:monospace;font-size:12px">frontend</code> → click <strong>Continue</strong></td></tr>
+          <tr><td>Build Command</td><td>Leave as default: <code style="font-family:monospace;font-size:12px">npm run build</code></td></tr>
+          <tr><td>Output Directory</td><td>Leave as default</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">4</div>
+        <div><h3>Add the one required environment variable</h3><p>Before clicking Deploy, scroll down to <strong>Environment Variables</strong>.</p></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:10px">Add this one variable:</p>
+        <div class="code-wrap">
+          <pre><span class="k">NEXT_PUBLIC_API_URL</span> = <span class="v">https://[YOUR-RAILWAY-URL]/api</span>
+
+<span class="c"># Example (use YOUR Railway URL from Step 6):</span>
+<span class="k">NEXT_PUBLIC_API_URL</span> = <span class="v">https://cerebre-media-production.up.railway.app/api</span>
+
+<span class="c"># IMPORTANT: The URL must end with /api</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">5</div>
+        <div><h3>Deploy and get your website URL</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Click the <strong>Deploy</strong> button</li>
+          <li>Wait 3–4 minutes for Vercel to build. You will see a progress log</li>
+          <li>When it says <strong>"Congratulations"</strong>, copy your website URL — it looks like: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px">https://cerebre-media.vercel.app</code></li>
+        </ol>
+        <div class="code-wrap">
+          <pre><span class="c"># Save your Vercel URL to your credentials file:</span>
+<span class="k">VERCEL_URL</span>=<span class="v">https://cerebre-media.vercel.app</span>
+<span class="c"># Replace with YOUR actual Vercel URL</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 9: CONNECT -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step9">
+  <div class="section-header">
+    <div class="section-num">9</div>
+    <div class="section-title-block">
+      <h2>Connect everything together</h2>
+      <p>Two final settings that make the frontend and backend communicate — estimated time: 3 minutes</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Tell the backend your website URL (CORS fix)</h3><p>The backend needs to know your website address to allow requests from it. Without this, your website cannot talk to the API.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Go back to <strong>Railway</strong></li>
+          <li>Click on your <strong>API service</strong> (not the worker)</li>
+          <li>Click the <strong>Variables</strong> tab</li>
+          <li>Find the <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">FRONTEND_URL</code> variable you left blank</li>
+          <li>Click edit and paste your Vercel URL</li>
+        </ol>
+        <div class="code-wrap">
+          <pre><span class="k">FRONTEND_URL</span> = <span class="v">https://cerebre-media.vercel.app</span>
+<span class="c"># Use YOUR actual Vercel URL from Step 8</span>
+<span class="c"># No trailing slash — no /api at the end — just the base URL</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <p style="font-size:13px;color:var(--gray-500);margin-top:8px">Railway will automatically redeploy the API service when you save this. Wait 2 minutes.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Also update FRONTEND_URL in the worker service</h3></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600)">Repeat the same step for the <strong>worker service</strong> — click on the worker in Railway → Variables → add or update <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">FRONTEND_URL</code> with the same Vercel URL.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- STEP 10: SEED -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="step10">
+  <div class="section-header">
+    <div class="section-num">10</div>
+    <div class="section-title-block">
+      <h2>Database setup and seed demo data</h2>
+      <p>Create demo data so you can log in and test immediately — estimated time: 3 minutes</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">1</div>
+        <div><h3>Open the Railway terminal</h3></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>In Railway, click on your <strong>API service</strong></li>
+          <li>Click the <strong>Terminal</strong> tab at the top (it looks like a command line icon)</li>
+          <li>A black terminal window will open. Click inside it and you will see a cursor</li>
+        </ol>
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>The Railway terminal runs commands directly inside your live server. Think of it like remote control for your server.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">2</div>
+        <div><h3>Run the database migration</h3><p>This creates all the database tables inside Supabase.</p></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">Type this command and press <strong>Enter</strong>:</p>
+        <div class="code-wrap">
+          <pre><span class="cmd">node src/db/db.js migrate</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <p style="font-size:13px;color:var(--gray-600);margin-top:8px">You should see: <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">Schema applied</code> or <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">All migrations already applied</code> — both are correct.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">3</div>
+        <div><h3>Seed the demo data</h3><p>This creates a demo account and 6 months of sample data so you can test immediately.</p></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">Type this command and press <strong>Enter</strong>:</p>
+        <div class="code-wrap">
+          <pre><span class="cmd">node src/db/seed.js</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <p style="font-size:13px;color:var(--gray-600);margin-top:8px">You should see messages confirming data was created — demo user, 6 months of metrics, 1 sample report.</p>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle">4</div>
+        <div><h3>🎉 Log in to your live application!</h3></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:10px">Open your Vercel URL in the browser and log in with:</p>
+        <div class="code-wrap">
+          <pre><span class="k">Website</span>:  <span class="url">https://cerebre-media.vercel.app</span>  <span class="c">(your URL)</span>
+
+<span class="k">Email</span>:    <span class="v">demo@cerebre.media</span>
+<span class="k">Password</span>: <span class="v">demo1234</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <div class="callout success" style="margin-top:12px">
+          <span class="callout-icon">🎉</span>
+          <div>
+            <strong>If you see the Cerebre dashboard with charts and data — your application is LIVE!</strong><br>
+            <span style="font-size:12px;margin-top:4px;display:block">Share the Vercel URL with your team. They can register their own accounts.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- CHECKLIST -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="checklist">
+  <div class="section-header">
+    <div class="section-num">✓</div>
+    <div class="section-title-block">
+      <h2>Final deployment checklist</h2>
+      <p>Tick each item as you complete it — your progress is saved in this page</p>
+    </div>
+  </div>
+
+  <ul class="checklist" id="main-checklist">
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Anthropic API key obtained and saved</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Code uploaded to GitHub repository</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Supabase project created (free tier)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">DATABASE_URL copied from Supabase and saved</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Schema SQL pasted and run in Supabase SQL Editor</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Upstash Redis created and REDIS_URL saved</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Cloudflare account created and R2 enabled</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">R2 bucket named "cerebre-media-files" created</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">R2 API token created — Access Key ID and Secret saved</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">S3_ENDPOINT saved (https://[account-id].r2.cloudflarestorage.com)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Railway account created (login with GitHub)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Railway API service created — Root directory: backend, Start: node src/server.js</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">All 11 environment variables added to Railway API service</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Railway API service deployed — status shows Active (green)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Railway API URL generated and saved (ends in .up.railway.app)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Health check passed: visiting /health returns {"status":"ok"}</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Railway Worker service created — Root directory: backend, Start: node src/workers/processor.js</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">All environment variables added to Worker service (same as API)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Worker service deployed — status shows Active</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Vercel account created (login with GitHub)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Vercel project created — Root directory set to "frontend"</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">NEXT_PUBLIC_API_URL added to Vercel (Railway URL + /api)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Vercel build succeeded — website URL saved (ends in .vercel.app)</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">FRONTEND_URL updated in Railway API service with Vercel URL</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">FRONTEND_URL updated in Railway Worker service with Vercel URL</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Railway terminal opened and migration run: node src/db/db.js migrate</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Seed command run: node src/db/seed.js</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Logged in at Vercel URL with demo@cerebre.media / demo1234</span></li>
+    <li class="check-item"><span class="check-box" onclick="toggleCheck(this)"></span><span class="check-label">Dashboard loads with charts and data ✓ APPLICATION IS LIVE 🎉</span></li>
+  </ul>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- TROUBLESHOOTING -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="troubleshoot">
+  <div class="section-header">
+    <div class="section-num">?</div>
+    <div class="section-title-block">
+      <h2>Something went wrong? Click your problem</h2>
+      <p>These are the 10 most common deployment issues — click each one to see the fix</p>
+    </div>
+  </div>
+
+  <div id="trouble-list">
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>The website loads but shows "Network Error" or "Failed to connect"</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">This means the frontend cannot reach the backend API. Check these in order:</p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Go to Vercel → your project → <strong>Settings</strong> → <strong>Environment Variables</strong></li>
+          <li>Confirm <code style="background:var(--gray-100);padding:2px 5px;border-radius:4px;font-family:monospace;font-size:11px">NEXT_PUBLIC_API_URL</code> is set and ends with <code>/api</code></li>
+          <li>Confirm the Railway URL in that variable is correct — test it by visiting <code>[railway-url]/health</code> directly in your browser</li>
+          <li>If you changed the variable, go to Vercel → <strong>Deployments</strong> → click <strong>Redeploy</strong> on the latest deployment</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>Login works but returns "Invalid token" or I get logged out immediately</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);">Your <code style="background:var(--gray-100);padding:2px 5px;border-radius:4px;font-family:monospace;font-size:11px">JWT_SECRET</code> is either missing or too short. Go to Railway → API service → Variables and confirm <code>JWT_SECRET</code> is set and is at least 32 characters long. After updating it, Railway will automatically redeploy.</p>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>Vercel build fails — "Module not found" or TypeScript errors</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">The most common cause is the Root Directory not being set correctly.</p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Go to Vercel → your project → <strong>Settings</strong> → <strong>General</strong></li>
+          <li>Find <strong>Root Directory</strong> and confirm it says <code style="background:var(--gray-100);padding:2px 4px;border-radius:4px;font-family:monospace;font-size:11px">frontend</code></li>
+          <li>If it's blank or wrong, change it to <code>frontend</code> and save</li>
+          <li>Go to <strong>Deployments</strong> → <strong>Redeploy</strong></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>Railway build fails with a "sharp" or "tesseract" error</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">These are native modules that need system build tools. Fix:</p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Go to Railway → API service → <strong>Settings</strong></li>
+          <li>Find <strong>Build Command</strong> and change it to:</li>
+        </ol>
+        <div class="code-wrap">
+          <pre><span class="cmd">npm install --ignore-scripts && npm run build 2>/dev/null; echo done</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>File uploads fail — files disappear or show an error</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">Almost always a Cloudflare R2 credential issue. Check all 5 of these in Railway → Variables:</p>
+        <ul style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li><code>AWS_ACCESS_KEY_ID</code> — must match the Access Key ID from Cloudflare R2</li>
+          <li><code>AWS_SECRET_ACCESS_KEY</code> — must match the Secret Access Key (check for typos)</li>
+          <li><code>S3_BUCKET_NAME</code> — must exactly match your bucket name: <code>cerebre-media-files</code></li>
+          <li><code>S3_ENDPOINT</code> — must be <code>https://[account-id].r2.cloudflarestorage.com</code> (include https://)</li>
+          <li><code>AWS_REGION</code> — must be set to <code>auto</code> for Cloudflare R2</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>Files upload but AI analysis never completes / stays "processing"</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">Usually one of these three problems:</p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li><strong>Worker not running:</strong> Check Railway → your project — confirm you see TWO services and both show Active (green dot)</li>
+          <li><strong>Wrong Anthropic key:</strong> In Railway → Worker service → Variables, confirm <code>ANTHROPIC_API_KEY</code> starts with <code>sk-ant-api03-</code> and has no extra spaces</li>
+          <li><strong>Redis not connecting:</strong> Confirm <code>REDIS_URL</code> in BOTH services starts with <code>rediss://</code> (double s) and the password is correct</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>CORS error — browser console shows "blocked by CORS policy"</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">The backend does not recognise your frontend's URL.</p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>Go to Railway → API service → Variables</li>
+          <li>Confirm <code>FRONTEND_URL</code> matches your Vercel URL exactly</li>
+          <li>It must include <code>https://</code> and have <strong>no trailing slash</strong></li>
+          <li>Correct: <code>https://cerebre-media.vercel.app</code></li>
+          <li>Wrong: <code>https://cerebre-media.vercel.app/</code> (trailing slash)</li>
+          <li>After fixing, Railway will redeploy automatically</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>Supabase "database connection failed" in Railway logs</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">The DATABASE_URL has an error. Common issues:</p>
+        <ul style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>You forgot to replace <code>[YOUR-PASSWORD]</code> with your actual Supabase database password</li>
+          <li>The password contains special characters like <code>@</code> or <code>#</code> that need to be URL-encoded — if your password has <code>@</code> change it to <code>%40</code> in the URL</li>
+          <li>The URL is missing the port — it should end in <code>:5432/postgres</code></li>
+        </ul>
+        <p style="font-size:13px;color:var(--gray-600)">Easiest fix: go to Supabase → Settings → Database → copy the connection string again fresh and paste it carefully.</p>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🔴</div>
+        <h4>The website shows a blank white page</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:8px">Right-click the page → <strong>Inspect</strong> → <strong>Console</strong> tab. Look for the red error message. Most common causes:</p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>If you see "NEXT_PUBLIC_API_URL is not defined" — the environment variable wasn't saved. Add it in Vercel and redeploy.</li>
+          <li>If you see "Module not found" — the Root Directory wasn't set to <code>frontend</code> in Vercel settings.</li>
+          <li>If there is no error and just a blank page — try a hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="trouble-item">
+      <div class="trouble-head" onclick="toggleTrouble(this)">
+        <div class="trouble-icon">🟡</div>
+        <h4>Railway shows a "sleeping" or "inactive" service</h4>
+        <span class="trouble-arrow">▶</span>
+      </div>
+      <div class="trouble-body">
+        <p style="font-size:13px;color:var(--gray-600);">Railway's free tier sleeps services after periods of inactivity. The first request after a sleep takes 20–30 seconds to wake up — this is normal on the free tier. To avoid this, upgrade to Railway's Starter plan ($5/month) which keeps services always on.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- WHAT'S NEXT -->
+<!-- ─────────────────────────────────────────────────── -->
+<section class="section" id="whats-next">
+  <div class="section-header">
+    <div class="section-num">→</div>
+    <div class="section-title-block">
+      <h2>What to do after deployment</h2>
+      <p>Your app is live — here is what to do in the first hour</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none">1</div>
+        <div><h3>Create your real admin account</h3><p>Don't use the demo account — create a proper account for your team.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 10px 16px;line-height:2.2">
+          <li>On the login page, click <strong>Register</strong></li>
+          <li>Create an account with your real email</li>
+          <li>Then go to Supabase → SQL Editor → run this to make yourself admin:</li>
+        </ol>
+        <div class="code-wrap">
+          <pre><span class="hi">UPDATE users SET role = 'admin' WHERE email = 'your@email.com';</span>
+<span class="c">-- Replace with the email you just registered with</span></pre>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none">2</div>
+        <div><h3>Upload your first real report</h3><p>Test the full pipeline with a real platform PDF.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 0 16px;line-height:2.2">
+          <li>Download an Insights export from Instagram, Facebook, Google Ads, or any platform</li>
+          <li>Go to <strong>Upload Reports</strong> in Cerebre</li>
+          <li>Drag the PDF or image file onto the upload area</li>
+          <li>Watch it process — it should take 30–60 seconds</li>
+          <li>When complete, click <strong>View Report</strong> to see the full AI analysis</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none">3</div>
+        <div><h3>Set your first business goal</h3><p>The AI tailors all recommendations to your active goals.</p></div>
+      </div>
+      <div class="step-card-body">
+        <ol style="font-size:13px;color:var(--gray-600);margin:0 0 0 16px;line-height:2.2">
+          <li>Click <strong>Goals</strong> in the sidebar</li>
+          <li>Click <strong>Add goal</strong></li>
+          <li>Choose a category, set a target, and pick a deadline</li>
+          <li>The AI will generate a strategy breakdown immediately</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none">4</div>
+        <div><h3>Add a custom domain (optional but recommended)</h3></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600)">To use your own domain like <code style="background:var(--gray-100);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">analytics.yourcompany.com</code> instead of the default Vercel URL:</p>
+        <ol style="font-size:13px;color:var(--gray-600);margin:8px 0 0 16px;line-height:2.2">
+          <li>Go to Vercel → your project → <strong>Settings</strong> → <strong>Domains</strong></li>
+          <li>Add your custom domain</li>
+          <li>Follow Vercel's instructions to update your DNS records (this takes 10–30 minutes to propagate)</li>
+          <li>Vercel handles SSL automatically — no extra configuration needed</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-card-head">
+        <div class="step-circle" style="background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none">5</div>
+        <div><h3>Invite your team</h3></div>
+      </div>
+      <div class="step-card-body">
+        <p style="font-size:13px;color:var(--gray-600)">Share the website URL with your team. They can click <strong>Register</strong> on the login page to create their own accounts. As admin, you can manage their access in the <strong>Admin Panel</strong> (shield icon in the sidebar).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary box -->
+  <div style="margin-top:32px;background:linear-gradient(135deg,#1e1b4b,#4c1d95);border-radius:16px;padding:32px;text-align:center">
+    <p style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:8px">🎉 You did it!</p>
+    <p style="color:#c4b5fd;font-size:14px;max-width:500px;margin:0 auto;line-height:1.7">
+      Cerebre Intelligence Platform is live. Your team can now upload social media reports, get AI-powered analysis, track goals, and monitor brand health — all in one place.
+    </p>
+    <div style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,.15);font-size:12px;color:#a78bfa">
+      Demo login: demo@cerebre.media / demo1234 · Admin login: the account you created
+    </div>
+  </div>
+</section>
+
+</div><!-- /content -->
+</main>
+</div><!-- /page-wrap -->
+
+<script>
+// ─── Copy button ─────────────────────────────────────
+function copyCode(btn) {
+  const pre = btn.previousElementSibling || btn.closest('.code-wrap').querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent.trim()).then(() => {
+    btn.textContent = '✓ copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ─── Checklist ───────────────────────────────────────
+function toggleCheck(box) {
+  box.classList.toggle('checked');
+  const li = box.closest('.check-item');
+  li.classList.toggle('checked-row', box.classList.contains('checked'));
+  box.textContent = box.classList.contains('checked') ? '✓' : '';
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = document.querySelectorAll('#main-checklist .check-box').length;
+  const done  = document.querySelectorAll('#main-checklist .check-box.checked').length;
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('progress-pct').textContent = pct + '%';
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+// ─── Troubleshoot accordion ──────────────────────────
+function toggleTrouble(head) {
+  const item = head.closest('.trouble-item');
+  item.classList.toggle('open');
+}
+
+// ─── Sidebar nav active ──────────────────────────────
+function setActive(link) {
+  document.querySelectorAll('.nav-item').forEach(l => l.classList.remove('active'));
+  link.classList.add('active');
+}
+
+// Auto-update nav on scroll
+const sections = document.querySelectorAll('section[id]');
+const navLinks  = document.querySelectorAll('.nav-item[href^="#"]');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => {
+        l.classList.remove('active');
+        if (l.getAttribute('href') === '#' + e.target.id) l.classList.add('active');
+      });
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

@@ -1,0 +1,17 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN apk add --no-cache python3 make g++ libc6-compat
+
+FROM base AS deps
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+FROM base AS runner
+COPY --from=deps /app/node_modules ./node_modules
+COPY src ./src
+COPY package.json ./
+
+ENV TESSDATA_PREFIX=/app/tessdata
+RUN mkdir -p /app/tessdata
+
+CMD ["node", "src/workers/processor.js"]
