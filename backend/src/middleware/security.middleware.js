@@ -126,39 +126,45 @@ const validators = {
   ],
 };
 
-// ── CORS configuration — NEVER use wildcard in production ─────────────
+
 const buildCorsConfig = () => {
-  const allowedOrigins = (process.env.FRONTEND_URL || '')
-    .split(',')
-    .map(o => o.trim())
-    .filter(Boolean);
+  const rawOrigins = process.env.FRONTEND_URL ?? '';
+
+  const allowedOrigins = new Set(
+    rawOrigins.split(',').map(o => o.trim()).filter(Boolean)
+  );
 
   if (process.env.NODE_ENV !== 'production') {
-    // Development: allow localhost
-    allowedOrigins.push('http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000');
+    ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000']
+      .forEach(o => allowedOrigins.add(o));
   }
 
-  if (allowedOrigins.length === 0) {
-    console.error('[SECURITY] WARNING: FRONTEND_URL not set. CORS will reject all cross-origin requests.');
+  if (allowedOrigins.size === 0) {
+    console.error('[CORS] CRITICAL: No allowed origins configured.');
+  } else {
+    console.info(`[CORS] Allowed origins: ${[...allowedOrigins].join(', ')}`);
   }
+
+  const isProd = process.env.NODE_ENV === 'production';
 
   return {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (server-to-server, curl, Postman in dev)
-      if (!origin && process.env.NODE_ENV !== 'production') return callback(null, true);
-      if (!origin) return callback(new Error('Origin required in production'), false);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+    origin(origin, callback) {
+      if (!origin) {
+        return isProd
+          ? callback(new Error('[CORS] Origin header required in production'), false)
+          : callback(null, true);
       }
-      callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      return allowedOrigins.has(origin)
+        ? callback(null, true)
+        : callback(new Error(`[CORS] Blocked origin: ${origin}`), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Brand-ID', 'X-Webhook-Token'],
-    maxAge: 86400, // Cache preflight for 24h
+    maxAge: 86_400,
   };
 };
+
 
 // ── Global rate limiter (IP-based, no Redis dependency) ───────────────
 const ipRateLimiter = (() => {

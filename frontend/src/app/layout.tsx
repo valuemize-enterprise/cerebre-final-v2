@@ -40,32 +40,32 @@ function useCookieSync(token: string | null) {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, token, isLoading, loadFromStorage, logout } = useAuthStore();
+  const { user, token, isHydrated, verifySession, logout } = useAuthStore();
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/';
   const isPublicPage = pathname.startsWith('/share/');
 
   // Sync JWT → cookie so Next.js middleware can check auth server-side
   useCookieSync(token);
 
-  useEffect(() => { loadFromStorage(); }, []);
+  useEffect(() => { verifySession(); }, []);
 
   useEffect(() => {
-    if (!isLoading && !user && !isAuthPage && !isPublicPage) router.push('/login');
-    if (!isLoading && user && isAuthPage) router.push('/dashboard');
-  }, [user, isLoading, isAuthPage, isPublicPage]);
+    if (!isHydrated && !user && !isAuthPage && !isPublicPage) router.push('/login');
+    if (!isHydrated && user && isAuthPage) router.push('/dashboard');
+  }, [user, isHydrated, isAuthPage, isPublicPage]);
 
-  if (isLoading) {
-    return (
-      <html lang="en">
-        <body className="bg-gray-50 dark:bg-gray-950 flex items-center justify-center min-h-screen">
-          <div className="flex flex-col items-center gap-3">
-            <Zap className="w-8 h-8 text-brand-500 animate-pulse" />
-            <p className="text-sm text-gray-400">Loading Cerebre Media...</p>
-          </div>
-        </body>
-      </html>
-    );
-  }
+  // if (isHydrated) {
+  //   return (
+  //     <html lang="en">
+  //       <body className="bg-gray-50 dark:bg-gray-950 flex items-center justify-center min-h-screen">
+  //         <div className="flex flex-col items-center gap-3">
+  //           <Zap className="w-8 h-8 text-brand-500 animate-pulse" />
+  //           <p className="text-sm text-gray-400">Loading Cerebre Media...</p>
+  //         </div>
+  //       </body>
+  //     </html>
+  //   );
+  // }
 
   return (
     <html lang="en">
