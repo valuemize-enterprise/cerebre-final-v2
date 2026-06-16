@@ -37,6 +37,9 @@ const scorecardsRoutes   = require('./routes/scorecards.routes');
 const extendedRoutes     = require('./routes/extended.routes');
 const webhooksRoutes     = require('./routes/webhooks.routes');
 const platformConnRoutes = require('./routes/platform-connections.routes');
+const clientPortalRoutes    = require('./routes/client-portal.routes');
+const extendedClientRoutes  = require('./routes/extended.routes');
+const agencyPerfRoutes      = require('./routes/agency-performance.routes');
 
 const { ocrQueue, analysisQueue } = require('./workers/queue');
 
@@ -143,6 +146,9 @@ app.use('/api/goals',               goalsRoutes);
 app.use('/api/scorecards',          scorecardsRoutes);
 app.use('/api/platform-connections', platformConnRoutes);
 app.use('/api/webhooks',            webhooksRoutes);
+app.use('/api/client',              clientPortalRoutes);
+app.use('/api',                     extendedClientRoutes);
+app.use('/api',                     agencyPerfRoutes);
 app.use('/api',                     extendedRoutes); // catch-all LAST
 
 // ── 404 handler ───────────────────────────────────────────────────────
@@ -201,7 +207,7 @@ bridge(ocrQueue,      'ocr:update');
 bridge(analysisQueue, 'analysis:update');
 
 // ── Start server ──────────────────────────────────────────────────────
-const PORT = config.port || 4000;
+const PORT = config.app.port || 4000;
 let activeConnections = 0;
 server.on('connection', conn => {
   activeConnections++;

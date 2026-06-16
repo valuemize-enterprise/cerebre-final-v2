@@ -16,6 +16,6 @@
     "plugins": [{ "name": "next" }],
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/lib/api.js", "src/lib/brand.js", "src/lib/nav-config.js", "src/lib/store.js", "src/lib/validators.js", "src/lib/types.js"],
   "exclude": ["node_modules"]
 }

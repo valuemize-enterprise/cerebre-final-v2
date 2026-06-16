@@ -18,7 +18,7 @@ services:
   worker:
     volumes:
       - ./backend/src:/app/src:ro
-    command: node --watch src/workers/processor.js
+    command: node --watch src/workers/scheduled.js
     environment:
       NODE_ENV: development
 

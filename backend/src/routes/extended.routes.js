@@ -11,6 +11,10 @@ const { query } = require('../db/db');
 const { authenticate } = require('../middleware/auth.middleware');
 const { asyncHandler } = require('../middleware/error.middleware');
 
+const bcrypt    = require('bcryptjs');
+const crypto    = require('crypto');
+const { authenticateClient } = require('./client-portal.routes');
+
 const router = express.Router();
 
 // ═══════════════════════════════════════════════════════════════
@@ -736,6 +740,457 @@ router.get('/voice-guardian/history', authenticate, asyncHandler(async (req, res
   const brandId = req.user.brandId || req.user.userId;
   const { rows } = await query('SELECT * FROM voice_checks WHERE brand_id=$1 ORDER BY checked_at DESC LIMIT 20',[brandId]).catch(() => ({ rows: [] }));
   res.json({ checks: rows });
+}));
+
+/**
+ * Extended Client Portal Routes — adds all missing endpoints
+ *
+ * Adds to existing client-portal.routes.js:
+ * - GET  /api/client/narrative          → NarrativeAI™ brand story
+ * - GET  /api/client/reports/:id/pdf    → PDF download (real implementation)
+ * - GET  /api/client/velocity           → VelocityTracker™ goal data
+ * - GET  /api/client/depth-view         → DepthView™ competitor data
+ * - GET  /api/client/intellipulse       → IntelliPulse™ live feed
+ * - POST /api/client/alerts/:id/read    → Mark alert as read
+ *
+ * Admin routes (agency staff only):
+ * - GET  /api/admin/brands              → all brands
+ * - POST /api/admin/client-portal-users → create client user
+ * - GET  /api/admin/client-portal-users → list all client users
+ * - POST /api/admin/client-portal-users/:id/resend-invite
+ * - POST /api/admin/brands/:brandId/generate-narrative → manual trigger
+ * - POST /api/admin/digest/send-weekly  → send all digests now
+ */
+
+
+
+// ══════════════════════════════════════════════════════════════════
+// CLIENT PORTAL: NARRATIVEAI™
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/client/narrative — get or generate the brand story
+router.get('/client/narrative', authenticateClient, asyncHandler(async (req, res) => {
+  const { brandId } = req.client;
+  const period = parseInt(req.query.period) || 30;
+  const { getNarrative } = require('../services/narrative-ai.service');
+  const narrative = await getNarrative(brandId, period);
+  res.json({ narrative, period });
+}));
+
+// ══════════════════════════════════════════════════════════════════
+// CLIENT PORTAL: PDF REPORT DOWNLOAD
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/client/reports/:id/pdf
+router.get('/client/reports/:id/pdf', authenticateClient, asyncHandler(async (req, res) => {
+  const { brandId } = req.client;
+  const { generatePDF } = require('../services/pdf-generator.service');
+  const result = await generatePDF(req.params.id, brandId);
+
+  if (result.format === 'pdf') {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="cerebre-report-${req.params.id}.pdf"`);
+    res.send(result.buffer);
+  } else {
+    // HTML fallback
+    res.setHeader('Content-Type', 'text/html');
+    res.send(result.html);
+  }
+}));
+
+// ══════════════════════════════════════════════════════════════════
+// CLIENT PORTAL: VELOCITYTRACKER™
+// Returns goal progress WITH velocity data (acceleration/deceleration)
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/client/velocity
+router.get('/client/velocity', authenticateClient, asyncHandler(async (req, res) => {
+  const { brandId } = req.client;
+
+  const [goalsRes, historyRes] = await Promise.all([
+    query(`SELECT * FROM priority_goals WHERE brand_id=$1 AND is_active=true ORDER BY priority_rank`, [brandId]),
+    query(`SELECT goal_id, recorded_value, progress_pct, recorded_at
+           FROM goal_history WHERE brand_id=$1
+           ORDER BY recorded_at ASC`, [brandId]),
+  ]);
+
+  // Group history by goal
+  const historyByGoal = {};
+  historyRes.rows.forEach(h => {
+    if (!historyByGoal[h.goal_id]) historyByGoal[h.goal_id] = [];
+    historyByGoal[h.goal_id].push({
+      date:  h.recorded_at,
+      value: parseFloat(h.recorded_value || 0),
+      pct:   parseFloat(h.progress_pct || 0),
+    });
+  });
+
+  // Calculate velocity for each goal
+  const goals = goalsRes.rows.map(g => {
+    const history = historyByGoal[g.id] || [];
+    const currentPct = parseFloat(g.progress_pct || 0);
+
+    // Velocity = change in progress % over last 2 data points
+    let velocity = 0;
+    let velocityLabel = 'STEADY';
+    if (history.length >= 2) {
+      const last    = history[history.length - 1].pct;
+      const prevLast = history[history.length - 2].pct;
+      velocity = last - prevLast;
+      velocityLabel = velocity > 5 ? 'ACCELERATING' : velocity > 0 ? 'PROGRESSING' : velocity === 0 ? 'STEADY' : 'DECELERATING';
+    }
+
+    // Will goal be achieved? Simple linear projection
+    const daysToDeadline = g.deadline
+      ? Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000)
+      : null;
+    const progressNeeded = 100 - currentPct;
+    const weeklyRate     = history.length >= 2 ? (history[history.length - 1].pct - history[0].pct) / Math.max(1, history.length - 1) : 0;
+    const weeksNeeded    = weeklyRate > 0 ? Math.ceil(progressNeeded / weeklyRate) : null;
+
+    let projectionStatus = 'UNKNOWN';
+    if (daysToDeadline !== null && weeksNeeded !== null) {
+      const daysNeeded = weeksNeeded * 7;
+      projectionStatus = daysNeeded <= daysToDeadline ? 'ON_TRACK' : daysNeeded <= daysToDeadline * 1.2 ? 'AT_RISK' : 'BEHIND';
+    }
+
+    return {
+      ...g,
+      history: history.slice(-12), // last 12 data points for chart
+      velocity,
+      velocityLabel,
+      projectionStatus,
+      daysToDeadline,
+    };
+  });
+
+  res.json({ goals });
+}));
+
+// ══════════════════════════════════════════════════════════════════
+// CLIENT PORTAL: DEPTHVIEW™ — COMPETITOR INTELLIGENCE
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/client/depth-view
+router.get('/client/depth-view', authenticateClient, asyncHandler(async (req, res) => {
+  const { brandId } = req.client;
+
+  const [myMetrics, competitors, sovHistory] = await Promise.all([
+    query(`SELECT platform, metric_type, SUM(value) as total
+           FROM live_metrics WHERE brand_id=$1
+           AND period_start >= NOW() - INTERVAL '30 days'
+           GROUP BY platform, metric_type ORDER BY platform`, [brandId]),
+
+    query(`SELECT * FROM competitors WHERE brand_id=$1 AND is_active=true
+           ORDER BY share_of_voice_estimate DESC`, [brandId]),
+
+    query(`SELECT platform, our_sov, period_end
+           FROM share_of_voice WHERE brand_id=$1
+           ORDER BY period_end DESC LIMIT 12`, [brandId]),
+  ]);
+
+  // Organise my metrics
+  const myPlatformMetrics = {};
+  myMetrics.rows.forEach(r => {
+    if (!myPlatformMetrics[r.platform]) myPlatformMetrics[r.platform] = {};
+    myPlatformMetrics[r.platform][r.metric_type] = parseFloat(r.total || 0);
+  });
+
+  // Build comparison matrix: for each competitor, compare key metrics
+  const comparisonMatrix = competitors.rows.map(comp => {
+    const estimates = typeof comp.follower_estimates === 'string'
+      ? JSON.parse(comp.follower_estimates) : (comp.follower_estimates || {});
+    const engagement = typeof comp.engagement_estimates === 'string'
+      ? JSON.parse(comp.engagement_estimates) : (comp.engagement_estimates || {});
+
+    return {
+      id:            comp.id,
+      name:          comp.competitor_name,
+      sov:           comp.share_of_voice_estimate,
+      followerEsts:  estimates,
+      engagementEsts: engagement,
+      lastActivity:  comp.last_notable_activity,
+      strategy:      comp.content_strategy_summary,
+      platforms:     typeof comp.platforms === 'string' ? JSON.parse(comp.platforms) : (comp.platforms || {}),
+    };
+  });
+
+  res.json({
+    myMetrics: myPlatformMetrics,
+    competitors: comparisonMatrix,
+    shareOfVoiceHistory: sovHistory.rows,
+    totalCompetitors: competitors.rows.length,
+  });
+}));
+
+// ══════════════════════════════════════════════════════════════════
+// CLIENT PORTAL: INTELLIPULSE™ — LIVE COMPETITOR ACTIVITY FEED
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/client/intellipulse
+router.get('/client/intellipulse', authenticateClient, asyncHandler(async (req, res) => {
+  const { brandId } = req.client;
+  const limit = parseInt(req.query.limit) || 20;
+
+  const { rows } = await query(
+    `SELECT ip.*, c.competitor_name
+     FROM intellipulse_feed ip
+     JOIN competitors c ON c.id = ip.competitor_id
+     WHERE ip.brand_id=$1
+     ORDER BY ip.detected_at DESC LIMIT $2`,
+    [brandId, limit]
+  ).catch(() => ({ rows: [] }));
+
+  // If no intellipulse data yet, return competitor last-activity summary
+  if (rows.length === 0) {
+    const { rows: compRows } = await query(
+      `SELECT competitor_name, last_notable_activity, content_strategy_summary, share_of_voice_estimate
+       FROM competitors WHERE brand_id=$1 AND is_active=true ORDER BY share_of_voice_estimate DESC`,
+      [brandId]
+    );
+    return res.json({
+      feed: compRows.map(c => ({
+        competitor_name: c.competitor_name,
+        type: 'strategy_summary',
+        title: `${c.competitor_name} overview`,
+        body: c.content_strategy_summary || c.last_notable_activity || 'No recent activity tracked',
+        sov: c.share_of_voice_estimate,
+        detected_at: new Date().toISOString(),
+      })),
+      hasRealData: false,
+    });
+  }
+
+  res.json({ feed: rows, hasRealData: true });
+}));
+
+// ══════════════════════════════════════════════════════════════════
+// CLIENT PORTAL: CULTURAL CALENDAR
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/client/moments — upcoming cultural moments
+router.get('/client/moments', authenticateClient, asyncHandler(async (req, res) => {
+  const { brandId } = req.client;
+  const { rows } = await query(
+    `SELECT * FROM cultural_moments
+     WHERE (brand_id=$1 OR brand_id IS NULL)
+     AND date_start >= CURRENT_DATE
+     ORDER BY date_start ASC LIMIT 12`,
+    [brandId]
+  ).catch(() => ({ rows: [] }));
+
+  // If no DB data, return the built-in Nigerian calendar
+  const year = new Date().getFullYear();
+  const builtIn = rows.length > 0 ? rows : [
+    { title: 'Sallah (Eid al-Adha)', date_start: `${year}-06-07`, moment_type: 'religious', content_ideas: JSON.stringify(['Festive greetings','Special offers','Celebration content']), avg_engagement_lift: 0.65, urgency: 'plan_now', country: 'Nigeria' },
+    { title: 'Independence Day', date_start: `${year}-10-01`, moment_type: 'public_holiday', content_ideas: JSON.stringify(['Nigerian pride content','1 October campaigns','Local culture celebration']), avg_engagement_lift: 0.70, urgency: 'plan_ahead', country: 'Nigeria' },
+    { title: 'Black Friday', date_start: `${year}-11-28`, moment_type: 'cultural_festival', content_ideas: JSON.stringify(['Flash sales','Countdown campaigns','Product bundles']), avg_engagement_lift: 0.80, urgency: 'plan_ahead', country: 'Nigeria' },
+    { title: 'Detty December', date_start: `${year}-12-01`, date_end: `${year}-12-31`, moment_type: 'cultural_festival', content_ideas: JSON.stringify(['Party/event content','Year-end campaigns','Lagos nightlife tie-ins']), avg_engagement_lift: 0.75, urgency: 'plan_ahead', country: 'Nigeria' },
+    { title: 'Christmas', date_start: `${year}-12-25`, moment_type: 'religious', content_ideas: JSON.stringify(['Christmas greetings','Gift guides','Family themes']), avg_engagement_lift: 0.65, urgency: 'plan_ahead', country: 'Nigeria' },
+  ];
+
+  res.json({ moments: builtIn });
+}));
+
+// ══════════════════════════════════════════════════════════════════
+// ADMIN: BRAND & CLIENT USER MANAGEMENT
+// ══════════════════════════════════════════════════════════════════
+
+// GET /api/admin/brands
+router.get('/admin/brands', authenticate, asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `SELECT id, name, industry, website, active_platforms, created_at FROM brands ORDER BY name`
+  ).catch(() => ({ rows: [] }));
+  res.json({ brands: rows });
+}));
+
+// POST /api/admin/brands — create a new brand
+router.post('/admin/brands', authenticate, asyncHandler(async (req, res) => {
+  const { name, industry, website, country, targetAudience } = req.body;
+  if (!name) return res.status(400).json({ error: 'Brand name required' });
+
+  // Ensure an organisation exists
+  const orgResult = await query(
+    `INSERT INTO organisations (name, slug, country)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (slug) DO UPDATE SET name=$1
+     RETURNING id`,
+    [name, name.toLowerCase().replace(/[^a-z0-9]/g, '-'), country || 'Nigeria']
+  );
+  const orgId = orgResult.rows[0].id;
+
+  const { rows } = await query(
+    `INSERT INTO brands (organisation_id, name, industry, website, country, target_audience)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [orgId, name, industry, website, country || 'Nigeria', targetAudience]
+  );
+  res.json({ brand: rows[0] });
+}));
+
+// GET /api/admin/client-portal-users
+router.get('/admin/client-portal-users', authenticate, asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `SELECT cpu.*, b.name as brand_name
+     FROM client_portal_users cpu
+     JOIN brands b ON b.id = cpu.brand_id
+     ORDER BY cpu.created_at DESC`
+  ).catch(() => ({ rows: [] }));
+  res.json({ users: rows });
+}));
+
+// POST /api/admin/client-portal-users — create a client portal account
+router.post('/admin/client-portal-users', authenticate, asyncHandler(async (req, res) => {
+  const {
+    brandId, email, fullName, jobTitle, phone, role = 'viewer',
+    can_ask_ai = true, can_download = true, can_view_competitors = true,
+  } = req.body;
+
+  if (!brandId || !email || !fullName) {
+    return res.status(400).json({ error: 'brandId, email, and fullName are required' });
+  }
+
+  // Generate a temporary password and invite token
+  const tempPassword = crypto.randomBytes(8).toString('base64url');
+  const inviteToken  = crypto.randomBytes(24).toString('base64url');
+  const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+  const { rows } = await query(
+    `INSERT INTO client_portal_users
+     (brand_id, email, password_hash, full_name, job_title, phone, role,
+      can_ask_ai, can_download, can_view_competitors, invite_token, invited_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [brandId, email.toLowerCase().trim(), passwordHash, fullName, jobTitle, phone, role,
+     can_ask_ai, can_download, can_view_competitors, inviteToken, req.user.userId]
+  );
+
+  const frontendUrl = process.env.FRONTEND_URL || 'https://cerebre.media';
+  const inviteUrl   = `${frontendUrl}/client/set-password?token=${inviteToken}`;
+
+  // Send welcome email
+  try {
+    const nodemailer = require('nodemailer');
+    const transport  = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.sendgrid.net',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+
+    const { name: brandName } = (await query('SELECT name FROM brands WHERE id=$1', [brandId])).rows[0] || {};
+
+    await transport.sendMail({
+      from:    `Cerebre Intelligence <${process.env.EMAIL_FROM || 'intelligence@cerebre.media'}>`,
+      to:      email,
+      subject: `You've been invited to the ${brandName || 'Brand'} Intelligence Portal`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;">
+          <div style="text-align:center;margin-bottom:32px;">
+            <h1 style="color:#6d28d9;font-size:24px;margin:0;">⚡ Cerebre Intelligence</h1>
+          </div>
+          <h2 style="font-size:20px;color:#111827;">Hello ${fullName.split(' ')[0]},</h2>
+          <p style="color:#374151;font-size:15px;line-height:1.7;">
+            Your account manager at Cerebre Media Africa has set up your intelligence dashboard.
+            You now have access to your brand's performance data, AI insights, and weekly reports.
+          </p>
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${inviteUrl}" style="background:linear-gradient(135deg,#6d28d9,#9333ea);color:white;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;">
+              Set up my password →
+            </a>
+          </div>
+          <p style="color:#9ca3af;font-size:13px;text-align:center;">
+            This invitation link expires in 7 days.<br>
+            Questions? Email hello@cerebre.media
+          </p>
+        </div>
+      `,
+    });
+  } catch (emailErr) {
+    // Email failure doesn't block account creation
+    console.warn('[Admin] Failed to send invite email:', emailErr.message);
+  }
+
+  res.json({ user: rows[0], inviteUrl, inviteToken });
+}));
+
+// PATCH /api/admin/client-portal-users/:id — update permissions
+router.patch('/admin/client-portal-users/:id', authenticate, asyncHandler(async (req, res) => {
+  const allowed = ['can_ask_ai', 'can_download', 'can_view_competitors', 'is_active', 'role'];
+  const updates = Object.fromEntries(
+    Object.entries(req.body).filter(([k]) => allowed.includes(k))
+  );
+  if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields to update' });
+
+  const sets = Object.keys(updates).map((k, i) => `${k}=$${i + 2}`).join(', ');
+  await query(`UPDATE client_portal_users SET ${sets} WHERE id=$1`, [req.params.id, ...Object.values(updates)]);
+  res.json({ updated: true });
+}));
+
+// DELETE /api/admin/client-portal-users/:id — revoke access
+router.delete('/admin/client-portal-users/:id', authenticate, asyncHandler(async (req, res) => {
+  await query('UPDATE client_portal_users SET is_active=false WHERE id=$1', [req.params.id]);
+  res.json({ revoked: true });
+}));
+
+// POST /api/admin/client-portal-users/:id/resend-invite — resend email
+router.post('/admin/client-portal-users/:id/resend-invite', authenticate, asyncHandler(async (req, res) => {
+  const { rows } = await query('SELECT * FROM client_portal_users WHERE id=$1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+  // Regenerate invite token
+  const token = crypto.randomBytes(24).toString('base64url');
+  await query('UPDATE client_portal_users SET invite_token=$1 WHERE id=$2', [token, req.params.id]);
+  const frontendUrl = process.env.FRONTEND_URL || 'https://cerebre.media';
+  res.json({ inviteUrl: `${frontendUrl}/client/set-password?token=${token}` });
+}));
+
+// POST /api/admin/digest/send-weekly — manual trigger (for testing)
+router.post('/admin/digest/send-weekly', authenticate, asyncHandler(async (req, res) => {
+  const { sendWeeklyDigests } = require('../services/digest-email.service');
+  const result = await sendWeeklyDigests();
+  res.json({ ...result, triggered: true });
+}));
+
+// POST /api/admin/brands/:brandId/generate-narrative — manually trigger narrative
+router.post('/admin/brands/:brandId/generate-narrative', authenticate, asyncHandler(async (req, res) => {
+  const { generateNarrative } = require('../services/narrative-ai.service');
+  const narrative = await generateNarrative(req.params.brandId, req.body.periodDays || 30);
+  res.json({ narrative });
+}));
+
+// GET /api/admin/client-portal/stats — overview of portal usage
+router.get('/admin/client-portal/stats', authenticate, asyncHandler(async (req, res) => {
+  const [users, logins, reports] = await Promise.all([
+    query('SELECT COUNT(*) as total, COUNT(CASE WHEN is_active THEN 1 END) as active FROM client_portal_users'),
+    query(`SELECT COUNT(*) as recent FROM client_portal_users WHERE last_login_at > NOW() - INTERVAL '7 days'`),
+    query('SELECT COUNT(*) as total FROM analysis_reports WHERE client_visible=true'),
+  ]);
+
+  res.json({
+    totalUsers:    parseInt(users.rows[0].total),
+    activeUsers:   parseInt(users.rows[0].active),
+    recentLogins:  parseInt(logins.rows[0].recent),
+    totalReports:  parseInt(reports.rows[0].total),
+  });
+}));
+
+module.exports = router;
+
+// POST /api/client/auth/set-password — used by invite flow
+router.post('/client/auth/set-password', asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password || password.length < 8) {
+    return res.status(400).json({ error: 'Valid token and password (8+ chars) required' });
+  }
+  const { rows } = await query(
+    'SELECT id FROM client_portal_users WHERE invite_token=$1 AND is_active=true', [token]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Invite link is invalid or has expired' });
+
+  const bcrypt = require('bcryptjs');
+  const hash   = await bcrypt.hash(password, 12);
+  await query(
+    'UPDATE client_portal_users SET password_hash=$1, invite_token=NULL WHERE id=$2',
+    [hash, rows[0].id]
+  );
+  res.json({ set: true });
 }));
 
 // ═══════════════════════════════════════════════════════════════

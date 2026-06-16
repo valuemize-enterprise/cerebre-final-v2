@@ -14,4 +14,4 @@ COPY package.json ./
 ENV TESSDATA_PREFIX=/app/tessdata
 RUN mkdir -p /app/tessdata
 
-CMD ["node", "src/workers/processor.js"]
+CMD ["node", "src/workers/scheduled.js"]

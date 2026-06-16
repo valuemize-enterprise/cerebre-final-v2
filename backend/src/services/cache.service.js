@@ -17,20 +17,16 @@
  *   - Health score:  15 minutes (expensive to recompute)
  *   - Benchmarks:    1 hour (static reference data)
  */
+import { pool } from '../db/db.js';
 
-interface CacheEntry<T> {
-  value: T;
-  expiresAt: number;
-  hits: number;
-}
 
-class TTLCache<T = any> {
-  private store = new Map<string, CacheEntry<T>>();
-  private ttlMs: number;
-  private maxSize: number;
-  private name: string;
+class TTLCache {
+   store = new Map();
+   ttlMs
+   maxSize
+   name
 
-  constructor(name: string, ttlSeconds: number, maxSize = 500) {
+  constructor(name, ttlSeconds, maxSize = 500) {
     this.name  = name;
     this.ttlMs = ttlSeconds * 1000;
     this.maxSize = maxSize;
@@ -39,7 +35,7 @@ class TTLCache<T = any> {
     setInterval(() => this.cleanup(), 60_000).unref();
   }
 
-  get(key: string): T | null {
+  get(key){
     const entry = this.store.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
@@ -50,7 +46,7 @@ class TTLCache<T = any> {
     return entry.value;
   }
 
-  set(key: string, value: T): void {
+  set(key, value) {
     // Evict oldest entries if at max size
     if (this.store.size >= this.maxSize) {
       const oldest = [...this.store.entries()]
@@ -60,17 +56,17 @@ class TTLCache<T = any> {
     this.store.set(key, { value, expiresAt: Date.now() + this.ttlMs, hits: 0 });
   }
 
-  invalidate(key: string): void {
+  invalidate(key) {
     this.store.delete(key);
   }
 
-  invalidatePrefix(prefix: string): void {
+  invalidatePrefix(prefix) {
     for (const key of this.store.keys()) {
       if (key.startsWith(prefix)) this.store.delete(key);
     }
   }
 
-  private cleanup(): void {
+   cleanup() {
     const now = Date.now();
     let removed = 0;
     for (const [key, entry] of this.store.entries()) {
@@ -98,10 +94,10 @@ export const benchCache   = new TTLCache('bench',   60 * 60);  // 1 hour
 
 // ── Cache-aware query helpers ─────────────────────────────────────────
 
-import { query } from '../db/db';
+
 
 /** Get brand with caching — avoids repeated SELECT on every dashboard load */
-export const getCachedBrand = async (brandId: string) => {
+export const getCachedBrand = async (brandId) => {
   const cached = brandCache.get(brandId);
   if (cached) return cached;
 
@@ -115,10 +111,10 @@ export const getCachedBrand = async (brandId: string) => {
 };
 
 /** Get active goals with caching — called before EVERY AI request */
-export const getCachedGoals = async (brandId: string) => {
+export const getCachedGoals = async (brandId) => {
   const cacheKey = `goals:${brandId}`;
   const cached = goalsCache.get(cacheKey);
-  if (cached) return cached as any[];
+  if (cached) return cached 
 
   const { rows } = await query(
     'SELECT * FROM priority_goals WHERE brand_id=$1 AND is_active=true ORDER BY priority_rank ASC',
@@ -129,10 +125,10 @@ export const getCachedGoals = async (brandId: string) => {
 };
 
 /** Get stored API key with caching — avoids decrypt on every AI call */
-export const getCachedApiKey = async (brandId: string, platform: string): Promise<string | null> => {
+export const getCachedApiKey = async (brandId, platform) => {
   const cacheKey = `${brandId}:${platform}`;
   const cached = apiKeyCache.get(cacheKey);
-  if (cached !== null) return cached as string | null;
+  if (cached !== null) return cached ;
 
   const { rows } = await query(
     'SELECT encrypted_key FROM api_keys_store WHERE brand_id=$1 AND platform=$2 AND is_active=true',
@@ -142,7 +138,7 @@ export const getCachedApiKey = async (brandId: string, platform: string): Promis
   if (!rows[0]) {
     // Cache the miss too (null) so we don't keep hitting DB
     const envKey = platform === 'anthropic' ? (process.env.ANTHROPIC_API_KEY || null) : null;
-    apiKeyCache.set(cacheKey, envKey as any);
+    apiKeyCache.set(cacheKey, envKey);
     return envKey;
   }
 
@@ -154,7 +150,7 @@ export const getCachedApiKey = async (brandId: string, platform: string): Promis
     const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(a, 'hex'));
     d.setAuthTag(Buffer.from(t, 'hex'));
     const decrypted = d.update(Buffer.from(b, 'hex')) + d.final('utf8');
-    apiKeyCache.set(cacheKey, decrypted as any);
+    apiKeyCache.set(cacheKey, decrypted);
     return decrypted;
   } catch {
     return null;
@@ -162,7 +158,7 @@ export const getCachedApiKey = async (brandId: string, platform: string): Promis
 };
 
 /** Invalidate cache when user updates their configuration */
-export const invalidateBrandCache = (brandId: string) => {
+export const invalidateBrandCache = (brandId) => {
   brandCache.invalidate(brandId);
   goalsCache.invalidatePrefix(`goals:${brandId}`);
   apiKeyCache.invalidatePrefix(brandId);
@@ -175,7 +171,7 @@ export const getCacheStats = () => [
   healthCache.stats(), benchCache.stats(),
 ];
 
-module.exports = {
+export const db = {
   brandCache, goalsCache, apiKeyCache, healthCache, benchCache,
   getCachedBrand, getCachedGoals, getCachedApiKey,
   invalidateBrandCache, getCacheStats,
