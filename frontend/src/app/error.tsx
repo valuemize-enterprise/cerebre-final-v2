@@ -1,51 +1,33 @@
 'use client';
-import { useEffect } from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { RefreshCw, Home } from 'lucide-react';
+import { BRAND } from '@/lib/brand';
 
-export default function GlobalError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
-  useEffect(() => {
-    console.error('[App Error]', error);
-  }, [error]);
-
+export default function ErrorPage({ error, reset }: { error: Error; reset: () => void }) {
   return (
-    <html lang="en">
-      <body className="bg-gray-50 dark:bg-gray-950 flex items-center justify-center min-h-screen p-6">
-        <div className="text-center max-w-sm">
-          <div className="w-16 h-16 bg-red-100 dark:bg-red-950/30 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
-          </div>
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Something went wrong
-          </h1>
-          <p className="text-sm text-gray-400 mb-2">
-            {error?.message || 'An unexpected error occurred.'}
-          </p>
-          {error?.digest && (
-            <p className="text-xs text-gray-300 dark:text-gray-700 font-mono mb-6">
-              Error ID: {error.digest}
-            </p>
-          )}
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={reset}
-              className="btn-secondary"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Try again
-            </button>
-            <a href="/dashboard" className="btn-primary">
-              <Home className="w-4 h-4" />
-              Dashboard
-            </a>
-          </div>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#060320' }}>
+      <div className="text-center max-w-md">
+        <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6"
+          style={{ background: 'rgba(239,68,68,0.12)', border: '2px solid rgba(239,68,68,0.25)' }}>
+          <span className="text-4xl">⚡</span>
         </div>
-      </body>
-    </html>
+        <h1 className="text-2xl font-black text-white mb-3">Something went wrong</h1>
+        <p className="text-white/45 text-sm leading-relaxed mb-8">
+          An unexpected error occurred. This has been logged and will be fixed. Try refreshing — it usually resolves itself.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <button onClick={reset}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110"
+            style={{ background: 'linear-gradient(135deg,#6d28d9,#9333ea)' }}>
+            <RefreshCw className="w-4 h-4" /> Try again
+          </button>
+          <a href="/dashboard"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white/50 hover:text-white/70 transition-colors"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <Home className="w-4 h-4" /> Dashboard
+          </a>
+        </div>
+        <p className="text-xs text-white/15 mt-6">{error?.message || 'Unknown error'}</p>
+      </div>
+    </div>
   );
 }

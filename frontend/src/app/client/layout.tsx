@@ -5,8 +5,8 @@ import {
   LayoutDashboard, BarChart2, FileText, Target, Radar,
   MessageSquare, Calendar, Bell, LogOut, Menu, X, Users, Award,
 } from 'lucide-react';
+import { BRAND } from '../../lib/brand';
 import clsx from 'clsx';
-import BRAND from '@/lib/brand';
 
 const NAV = [
   { href: '/client/dashboard',   label: 'Dashboard',        icon: LayoutDashboard },
@@ -20,20 +20,40 @@ const NAV = [
   { href: '/client/moments',     label: 'Calendar',         icon: Calendar        },
 ];
 
-const EXCLUDED = ['/client/login', '/client/set-password'];
+/**
+ * Routes that should render full-screen WITHOUT the client sidebar shell
+ * and WITHOUT the token-required redirect check below.
+ *
+ * - /client/login, /client/set-password: pre-auth, no token exists yet
+ * - /client/forgot-password, /client/reset-password: pre-auth password recovery
+ * - /client/onboarding: post-auth but intentionally full-screen (its own
+ *   guided tour layout). It calls authenticated API endpoints itself, so if
+ *   a token is genuinely missing, those calls 401 and SessionGuard's global
+ *   interceptor redirects to /client/login as a safety net.
+ *
+ * IMPORTANT: when adding new public-facing /client/* pages in the future,
+ * add them here too, or they will be silently redirected to /client/login
+ * before they get a chance to render.
+ */
+const EXCLUDED = [
+  '/client/login',
+  '/client/set-password',
+  '/client/forgot-password',
+  '/client/reset-password',
+  '/client/onboarding',
+];
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const router    = useRouter();
   const pathname  = usePathname();
   const [client, setClient]       = useState<any>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [unread, setUnread]       = useState(0);
 
   useEffect(() => {
     if (EXCLUDED.some(p => pathname?.startsWith(p))) return;
     const token = localStorage.getItem(BRAND.storage.clientToken);
     const info  = localStorage.getItem(BRAND.storage.clientInfo);
-    if (!token) { router.replace('/client/login'); return; }
+    if (!token) { router.replace(`/client/login?redirect=${encodeURIComponent(pathname || '/client/dashboard')}`); return; }
     if (info) setClient(JSON.parse(info));
   }, [pathname, router]);
 
@@ -109,7 +129,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3 border-b"
         style={{ background: 'rgba(6,3,32,0.9)', borderColor: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)' }}>
         <SabiLogo />
-        <button onClick={() => setMobileOpen(o=>!o)} className="text-white/60 p-1">
+        <button onClick={() => setMobileOpen(o => !o)} className="text-white/60 p-1">
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>

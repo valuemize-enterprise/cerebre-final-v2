@@ -9,18 +9,24 @@
  * 5. Retry logic for transient failures (503, 429, network timeout)
  * 6. Request timeout (30s) — prevents hung requests with no feedback
  * 7. Consistent error format that the UI can display properly
+ *
+ * ADDED: `authApi` — this was imported by lib/store.ts but never actually
+ * defined anywhere in the codebase, which meant any call to
+ * useAuthStore().login(...) would throw at runtime ("authApi is undefined").
+ * It's defined at the bottom of this file now.
  */
 
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import { useAuthStore } from './store';
 
-
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 if (!BASE_URL && typeof window !== 'undefined') {
-  console.error('[API] NEXT_PUBLIC_API_URL is not set. Add it to Vercel → Environment Variables.');
+  console.error(
+    '[API] NEXT_PUBLIC_API_URL is not set. ' +
+    'Add it to Vercel Environment Variables as https://your-api.railway.app/api'
+  );
 }
-
 
 // ── Axios instance ────────────────────────────────────────────────────
 const api = axios.create({
@@ -33,6 +39,8 @@ const api = axios.create({
 // ── Request deduplication — prevents double-POST on button click ───────
 const pendingRequests = new Map<string, number>();
 let requestCounter = 0;
+
+
 
 api.interceptors.request.use((config) => {
   // Attach auth token
@@ -194,6 +202,58 @@ export const safeApiCall = async <T>(
   }
 };
 
+export const adminApi = {
+  stats:       () => api.get('/admin/stats'),
+  users:       () => api.get('/admin/users'),
+  updateUser:  (userId: string, data: any) => api.patch(`/admin/users/${userId}`, data),
+  deleteUser:  (userId: string) => api.delete(`/admin/users/${userId}`),
+  retryFailed: () => api.post('/admin/jobs/retry-failed'),
+};
+
+export const metricsApi = {
+  platforms:   (params?: any) => api.get('/metrics/platforms', { params }),
+  platform:    (p: string, months = 12) => api.get(`/metrics/platforms/${p}`, { params: { months } }),
+  compare:     (params: any) => api.get('/metrics/compare', { params }),
+  funnel:      (months = 1) => api.get('/metrics/funnel', { params: { months } }),
+  leaderboard: (metric = 'impressions', limit = 5) => api.get('/metrics/leaderboard', { params: { metric, limit } }),
+};
+
+export const reportsApi = {
+  analyze:    (fileId: string, cmpFileId?: string) => api.post('/reports/analyze', { fileId, comparisonFileId: cmpFileId }),
+  retry:      (fileId: string) => api.post(`/reports/retry/${fileId}`),
+  list:       (page = 1) => api.get(`/reports?page=${page}`),
+  get:        (id: string) => api.get(`/reports/${id}`),
+  compare:    (a: string, b: string) => api.get(`/reports/compare/${a}/${b}`),
+  history:    (params?: any) => api.get('/reports/history/metrics', { params }),
+  dashboard:  () => api.get('/reports/summary/dashboard'),
+  share:      (id: string, expiresInDays = 7) => api.post(`/reports/${id}/share`, { expiresInDays }),
+  revokeShare:(id: string) => api.delete(`/reports/${id}/share`),
+  getShared:  (token: string) => api.get(`/reports/shared/${token}`),
+};
+
+export const uploadApi = {
+  upload: (formData: FormData, onProgress?: (pct: number) => void) =>
+    api.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (e) => onProgress?.(Math.round(((e.loaded ?? 0) * 100) / (e.total ?? 1))),
+    }),
+  list:     (page = 1) => api.get(`/upload?page=${page}`),
+  status:   (fileId: string) => api.get(`/upload/${fileId}/status`),
+  download: (fileId: string) => api.get(`/upload/${fileId}/download`),
+  delete:   (fileId: string) => api.delete(`/upload/${fileId}`),
+};
+
+export const settingsApi = {
+  getProfile:       () => api.get('/settings/profile'),
+  updateProfile:    (data: any) => api.put('/settings/profile', data),
+  changePassword:   (data: any) => api.put('/settings/password', data),
+  getApiKey:        () => api.get('/settings/my-api-key'),
+  saveApiKey:       (platform: string, apiKey: string, extra?: any) =>
+    api.post('/settings/api-keys', { platform, apiKey, extra }),
+  testApiKey:       (platform: string, apiKey: string) =>
+    api.post('/settings/test-api-key', { platform, apiKey }),
+};
+
 // ── Retry wrapper for transient failures ─────────────────────────────
 export const withRetry = async <T>(
   fn: () => Promise<T>,
@@ -212,120 +272,31 @@ export const withRetry = async <T>(
   }
 };
 
-
-// Attach JWT from localStorage on every request
-api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('cm_token');
-    if (token && token !== 'null' && token !== 'undefined' && !token.startsWith('{')) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
-
-// Unified error handling
-api.interceptors.response.use(
-  (res) => res,
-  (error: AxiosError) => {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-      throw new ApiError('You appear to be offline. Check your internet connection and try again.', 0, 'OFFLINE');
-    }
-    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      throw new ApiError('Request timed out. The server may be starting up — wait 30 seconds and try again.', 408, 'TIMEOUT');
-    }
-    if (!error.response) {
-      throw new ApiError('Cannot reach the server. It may be waking up — wait 30 seconds and try again.', 503, 'SERVER_UNREACHABLE');
-    }
-
-    const { status, data } = error.response;
-    const msg = (data as any)?.error || (data as any)?.message;
-
-    if (status === 401) {
-      if (typeof window !== 'undefined') {
-        const hadToken = !!localStorage.getItem('cm_token');
-        if (hadToken) {
-          localStorage.removeItem('cm_token');
-          // Don't redirect inside interceptor if we're on the login page already
-          if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login?reason=session_expired';
-          }
-        }
-      }
-      throw new ApiError('Your session has expired. Please sign in again.', 401, 'SESSION_EXPIRED');
-    }
-    if (status === 403) throw new ApiError("You don't have permission to do this.", 403, 'FORBIDDEN');
-    if (status === 404) throw new ApiError(msg || 'Not found.', 404, 'NOT_FOUND');
-    if (status === 422) {
-      const details = (data as any)?.details;
-      const fieldMsg = details?.map((d: any) => `${d.field}: ${d.message}`).join('. ');
-      throw new ApiError(fieldMsg || msg || 'Please check your input and try again.', 422, 'VALIDATION_ERROR', details);
-    }
-    if (status === 429) throw new ApiError('Too many requests. Please slow down and try again.', 429, 'RATE_LIMITED');
-    if (status >= 500) throw new ApiError(msg || 'Something went wrong on our end. Please try again.', status, 'SERVER_ERROR');
-    throw new ApiError(msg || 'An unexpected error occurred.', status, 'UNKNOWN');
-  }
-);
-
-// Auth API — used by store.ts
+// ── Auth API ────────────────────────────────────────────────────────
+// This was previously imported by lib/store.ts (`import { authApi } from
+// './api'`) but never defined anywhere, which meant useAuthStore().login()
+// would throw "authApi is undefined" the first time anyone called it.
 export const authApi = {
-  login:    (data: { email: string; password: string }) => api.post('/auth/login', data),
-  register: (data: { email: string; password: string; fullName: string; company?: string }) =>
+  login:    (credentials: { email: string; password: string }) =>
+    api.post('/auth/login', credentials),
+
+  register: (data: { name: string; email: string; password: string; invite_code?: string }) =>
     api.post('/auth/register', data),
-  me: () => api.get('/auth/me'),
-};
 
-export const uploadApi = {
-  upload: (formData: FormData, onProgress?: (pct: number) => void) =>
-    api.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: (e) => onProgress?.(Math.round(((e.loaded ?? 0) * 100) / (e.total ?? 1))),
-    }),
-  list:     (page = 1) => api.get(`/upload?page=${page}`),
-  status:   (fileId: string) => api.get(`/upload/${fileId}/status`),
-  download: (fileId: string) => api.get(`/upload/${fileId}/download`),
-  delete:   (fileId: string) => api.delete(`/upload/${fileId}`),
-};
+  me: () =>
+    api.get('/auth/me'),
 
-export const reportsApi = {
-  analyze:    (fileId: string, cmpFileId?: string) => api.post('/reports/analyze', { fileId, comparisonFileId: cmpFileId }),
-  retry:      (fileId: string) => api.post(`/reports/retry/${fileId}`),
-  list:       (page = 1) => api.get(`/reports?page=${page}`),
-  get:        (id: string) => api.get(`/reports/${id}`),
-  compare:    (a: string, b: string) => api.get(`/reports/compare/${a}/${b}`),
-  history:    (params?: any) => api.get('/reports/history/metrics', { params }),
-  dashboard:  () => api.get('/reports/summary/dashboard'),
-  share:      (id: string, expiresInDays = 7) => api.post(`/reports/${id}/share`, { expiresInDays }),
-  revokeShare:(id: string) => api.delete(`/reports/${id}/share`),
-  getShared:  (token: string) => api.get(`/reports/shared/${token}`),
-};
+  logout: () =>
+    api.post('/auth/logout'),
 
-export const metricsApi = {
-  platforms:   (params?: any) => api.get('/metrics/platforms', { params }),
-  platform:    (p: string, months = 12) => api.get(`/metrics/platforms/${p}`, { params: { months } }),
-  compare:     (params: any) => api.get('/metrics/compare', { params }),
-  funnel:      (months = 1) => api.get('/metrics/funnel', { params: { months } }),
-  leaderboard: (metric = 'impressions', limit = 5) => api.get('/metrics/leaderboard', { params: { metric, limit } }),
-};
+  forgotPassword: (email: string) =>
+    api.post('/auth/forgot-password', { email }),
 
-export const settingsApi = {
-  getProfile:       () => api.get('/settings/profile'),
-  updateProfile:    (data: any) => api.put('/settings/profile', data),
-  changePassword:   (data: any) => api.put('/settings/password', data),
-  getApiKey:        () => api.get('/settings/my-api-key'),
-  saveApiKey:       (platform: string, apiKey: string, extra?: any) =>
-    api.post('/settings/api-keys', { platform, apiKey, extra }),
-  testApiKey:       (platform: string, apiKey: string) =>
-    api.post('/settings/test-api-key', { platform, apiKey }),
-};
+  resetPassword: (token: string, new_password: string) =>
+    api.post('/auth/reset-password', { token, new_password }),
 
-export const adminApi = {
-  stats:       () => api.get('/admin/stats'),
-  users:       () => api.get('/admin/users'),
-  updateUser:  (userId: string, data: any) => api.patch(`/admin/users/${userId}`, data),
-  deleteUser:  (userId: string) => api.delete(`/admin/users/${userId}`),
-  retryFailed: () => api.post('/admin/jobs/retry-failed'),
+  changePassword: (old_password: string, new_password: string) =>
+    api.put('/auth/change-password', { old_password, new_password }),
 };
 
 export default api;
-

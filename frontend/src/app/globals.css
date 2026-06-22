@@ -2,68 +2,151 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* ───────────────────────────────────────────────────────────
+   Sabi Intelligence Suite — Global Styles
+   Cerebre Media Africa
+   ─────────────────────────────────────────────────────────── */
 
-@layer base {
-  *, *::before, *::after { box-sizing: border-box; }
+:root {
+  color-scheme: dark;
+  --sabi-bg:        #060320;
+  --sabi-surface:   rgba(255, 255, 255, 0.04);
+  --sabi-border:    rgba(255, 255, 255, 0.08);
+  --sabi-brand:     #6d28d9;
+  --sabi-brand-mid: #7c3aed;
+  --sabi-brand-dark:#4c1d95;
+  --sabi-accent:    #a78bfa;
+  --sabi-text:      rgba(255, 255, 255, 0.85);
+  --sabi-muted:     rgba(255, 255, 255, 0.4);
+}
 
-  html {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    scroll-behavior: smooth;
-  }
+* {
+  box-sizing: border-box;
+}
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-  @media (prefers-color-scheme: dark) {
-    ::-webkit-scrollbar-thumb { background: #374151; }
-    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--sabi-bg);
+  color: var(--sabi-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── Custom scrollbar (webkit) ──────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(109, 40, 217, 0.35);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(109, 40, 217, 0.55);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(109, 40, 217, 0.35) transparent;
+}
+
+/* ── Selection colour ───────────────────────────────────────── */
+::selection {
+  background: rgba(109, 40, 217, 0.4);
+  color: #fff;
+}
+
+/* ── Focus visibility (accessibility, kept subtle) ──────────── */
+:focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Autofill override (Chrome forces white bg by default) ──── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0px 1000px #14102e inset;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: #fff;
+}
+
+/* ── Remove number input spinners for cleaner forms ─────────── */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* ── Date input calendar icon — make visible on dark bg ─────── */
+input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(0.6);
+  cursor: pointer;
+}
+
+/* ── Recharts tooltip / cursor cleanup ──────────────────────── */
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+.recharts-cartesian-axis-tick-value {
+  font-family: var(--font-inter), sans-serif;
+}
+
+/* ── Image rendering ─────────────────────────────────────────── */
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ── Disable iOS tap highlight, we handle our own active states ─ */
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Toast portal z-index safety ────────────────────────────── */
+#__next-route-announcer__ {
+  display: none;
+}
+
+/* ── Print styles (reports / PDFs viewed in-browser) ─────────── */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
   }
 }
 
-@layer components {
-  /* Reusable input base */
-  .input-base {
-    @apply w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700
-           bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-           placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500
-           focus:border-transparent transition;
+/* ── Reduced motion accessibility ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-
-  /* Card base */
-  .card {
-    @apply bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800;
-  }
-
-  /* Primary button */
-  .btn-primary {
-    @apply px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium
-           rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed
-           flex items-center justify-center gap-2;
-  }
-
-  /* Secondary button */
-  .btn-secondary {
-    @apply px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700
-           text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors
-           flex items-center justify-center gap-2;
-  }
-
-  /* Section header */
-  .section-title {
-    @apply text-xs font-semibold uppercase tracking-wider text-gray-400;
-  }
-
-  /* Status badges */
-  .badge-success { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400; }
-  .badge-warning { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
-  .badge-danger  { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400; }
-  .badge-info    { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400; }
-  .badge-neutral { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400; }
 }

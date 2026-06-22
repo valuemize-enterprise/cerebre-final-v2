@@ -1,76 +1,64 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { authApi } from './api';
-import Cookies from 'js-cookie';
+import { BRAND } from './brand';
 
-interface User {
+/**
+ * Sabi Auth Store
+ * ─────────────────────────────────────────────────────────────
+ * Single source of truth for agency/staff authentication state.
+ * Client portal auth is handled separately via localStorage directly
+ * (BRAND.storage.clientToken / clientInfo) since clients are not
+ * agency users and don't need the full Zustand store.
+ *
+ * Persisted to localStorage under BRAND.storage.zustandStore ('sabi-auth').
+ * The raw token is ALSO mirrored to BRAND.storage.agencyToken ('sabi_token')
+ * as a plain string for axios interceptors and pages that read it directly
+ * via localStorage.getItem('sabi_token').
+ */
+
+export interface User {
   id: string;
   email: string;
-  full_name: string;
-  company: string;
-  role: string;
-  name?: string;
-  displayName?: string;
-  brandId?: string;
-}
-
-interface RegisterData {
-  email: string;
-  password: string;
-  fullName: string;
+  name: string;
+  full_name?: string;
   company?: string;
+  role: 'admin' | 'analyst' | 'staff' | string;
+  role_title?: string;
+  avatar_url?: string;
 }
 
 interface AuthState {
   user: User | null;
   token: string | null;
-  isLoading: boolean;
   isHydrated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
-  loadFromStorage: () => Promise<void>;
-  setAuth: (user: User, token: string) => void;
-  logout: () => void;
-  verifySession: () => Promise<void>;
-}
 
-const normaliseUser = (u: any): User => ({
-  id: u?.id || u?._id || "",
-  email: u?.email || "",
-  name: u?.name || u?.full_name || u?.fullName || u?.email?.split("@")[0] || "User",
-  full_name: u?.full_name || u?.name || u?.fullName || "",
-  displayName: u?.name || u?.full_name || u?.fullName || u?.email?.split("@")[0] || "User",
-  company: u?.company || "",
-  role: u?.role || "analyst",
-  brandId: u?.brandId || u?.brand_id || u?.id || "",
-});
+  /** Set auth state directly — used by login/register/onboarding flows */
+  setAuth: (user: User, token: string) => void;
+
+  /** Convenience login that calls the API then sets state */
+  login: (email: string, password: string) => Promise<void>;
+
+  /** Clears all auth state and mirrored localStorage token */
+  logout: () => void;
+
+  /** Update user fields without touching the token (e.g. after profile edit) */
+  updateUser: (partial: Partial<User>) => void;
+}
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
       token: null,
-      isLoading: true,
       isHydrated: false,
 
-      setAuth: (user: User, token: string) => {
-        if (typeof token !== "string" || !token || token.length < 10) {
-          console.error("[Auth] setAuth: invalid token:", typeof token);
-          return;
+      setAuth: (user, token) => {
+        // Mirror to plain localStorage key for axios interceptors / direct reads
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(BRAND.storage.agencyToken, token);
         }
-        if (typeof user !== "object" || !user) {
-          console.error("[Auth] setAuth: invalid user:", typeof user);
-          return;
-        }
-
-        Cookies.set("cm_token", token, {
-          expires: 7,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
-        });
-        localStorage.setItem("cm_token", token);
-
-        set({ user: normaliseUser(user), token });
+        set({ user, token });
       },
 
       login: async (email, password) => {
@@ -78,56 +66,31 @@ export const useAuthStore = create<AuthState>()(
         get().setAuth(data.user, data.token);
       },
 
-      register: async (registerData) => {
-        await authApi.register(registerData);
-      },
-
       logout: () => {
-        Cookies.remove("cm_token");
-        localStorage.removeItem("cm_token");
-        if (typeof document !== "undefined") {
-          document.cookie = "cm_token=; path=/; max-age=0; SameSite=Lax";
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(BRAND.storage.agencyToken);
         }
         set({ user: null, token: null });
       },
 
-      loadFromStorage: async () => {
-        try {
-          const token = localStorage.getItem("cm_token");
-          if (!token) { set({ isLoading: false }); return; }
-          const { data } = await authApi.me();
-          set({ user: normaliseUser(data.user || data), token, isLoading: false });
-        } catch {
-          localStorage.removeItem("cm_token");
-          set({ user: null, token: null, isLoading: false });
-        }
-      },
-
-      verifySession: async () => {
-        const { token } = get();
-        if (!token || typeof token !== "string" || token.length < 10 || token.startsWith("{")) {
-          set({ user: null, token: null });
-          return;
-        }
-        try {
-          const { data } = await authApi.me();
-          set({ user: normaliseUser(data.user || data) });
-        } catch {
-          set({ user: null, token: null });
-        }
+      updateUser: (partial) => {
+        const current = get().user;
+        if (current) set({ user: { ...current, ...partial } });
       },
     }),
     {
-      name: "cerebre-auth",
+      name: BRAND.storage.zustandStore, // 'sabi-auth'
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ user: state.user, token: state.token }),
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.isHydrated = true;
-          if (state.token) {
-            state.verifySession().catch(() => {});
-          }
+        // Called once persisted state has been read from localStorage.
+        // Ensure the mirrored plain token key stays in sync after rehydration.
+        if (state?.token && typeof window !== 'undefined') {
+          localStorage.setItem(BRAND.storage.agencyToken, state.token);
         }
+        // Mark hydrated via direct mutation since onRehydrateStorage runs
+        // outside the normal set() flow.
+        useAuthStore.setState({ isHydrated: true });
       },
     }
   )

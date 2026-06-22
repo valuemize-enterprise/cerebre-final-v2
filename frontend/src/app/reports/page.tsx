@@ -1,181 +1,159 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { reportsApi } from '../../lib/api';
-import Link from 'next/link';
-import {
-  FileBarChart, TrendingUp, TrendingDown, Minus,
-  ChevronRight, Loader2, Calendar,
-} from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { FileText, Download, Eye, Search, Filter, Loader2, Plus, Zap, Building2, Calendar } from 'lucide-react';
+import { PageHeader, Card, Badge, Button, SearchInput, Tabs, EmptyState, TOKENS } from '@/components';
+import axios from 'axios';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
-const CompareIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
-    <path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/>
-    <polyline points="15 9 18 6 21 9"/><polyline points="9 15 6 18 3 15"/>
-  </svg>
-);
+const API  = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const hdrs = () => {
+  const token = typeof window !== "undefined" ? localStorage.getItem('sabi_token') : null;
+  return { Authorization: `Bearer ${token}` };
+};
 
-const DirectionIcon = ({ d }: { d: string }) => {
-  if (d === 'growing') return <TrendingUp className="w-4 h-4 text-green-500" />;
-  if (d === 'declining') return <TrendingDown className="w-4 h-4 text-red-500" />;
-  return <Minus className="w-4 h-4 text-gray-400" />;
+const TYPE_LABELS: Record<string, string> = {
+  monthly: 'Monthly', weekly: 'Weekly', campaign: 'Campaign',
+  quarterly: 'Quarterly', instagram: 'Instagram', facebook: 'Facebook',
+  google_analytics: 'Google Analytics', tiktok: 'TikTok', ad_account: 'Ad Account',
+};
+
+const statusOf = (r: any) => {
+  if (r.ai_processed)        return { label: 'AI analysed', variant: 'success'  as const };
+  if (r.processing_status === 'processing') return { label: 'Processing', variant: 'warning' as const };
+  if (r.processing_status === 'error')      return { label: 'Failed',     variant: 'danger'  as const };
+  return { label: 'Uploaded', variant: 'default' as const };
 };
 
 export default function ReportsPage() {
-  const [reports, setReports] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [compareA, setCompareA] = useState<string | null>(null);
+  const [reports,  setReports]  = useState<any[]>([]);
+  const [brands,   setBrands]   = useState<any[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [search,   setSearch]   = useState('');
+  const [tab,      setTab]      = useState('all');
+  const [brand,    setBrand]    = useState('');
+  const [downloading, setDownloading] = useState('');
 
-  const load = async (p: number) => {
-    setLoading(true);
+  useEffect(() => {
+    Promise.all([
+      axios.get(`${API}/reports`,         { headers: hdrs() }).catch(() => ({ data: { reports: [] } })),
+      axios.get(`${API}/admin/brands`,    { headers: hdrs() }).catch(() => ({ data: { brands: [] } })),
+    ]).then(([r, b]) => {
+      setReports(r.data.reports || []);
+      setBrands(b.data.brands  || []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const downloadPDF = async (report: any) => {
+    setDownloading(report.id);
     try {
-      const { data } = await reportsApi.list(p);
-      setReports(data.reports || []);
-      setTotal(data.pagination?.total || 0);
-    } catch {
-      toast.error('Failed to load reports');
-    } finally {
-      setLoading(false);
-    }
+      if (report.pdf_url) { window.open(report.pdf_url, '_blank'); return; }
+      const { data } = await axios.get(`${API}/reports/${report.id}/pdf`,
+        { headers: hdrs(), responseType: 'blob' });
+      const url  = URL.createObjectURL(new Blob([data]));
+      const link = document.createElement('a');
+      link.href = url; link.download = `${report.brand_name}-${report.report_period || report.id}.pdf`;
+      link.click();
+    } catch { toast.error('PDF not available yet'); }
+    finally { setDownloading(''); }
   };
 
-  useEffect(() => { load(page); }, [page]);
-
-  const handleCompareSelect = (reportId: string) => {
-    if (!compareA) {
-      setCompareA(reportId);
-      toast('Select a second report to compare', { icon: '🔄' });
-    } else if (compareA === reportId) {
-      setCompareA(null);
-    } else {
-      window.location.href = `/reports/compare/${compareA}/${reportId}`;
-    }
-  };
-
-  if (loading && reports.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-      </div>
-    );
-  }
+  const filtered = reports
+    .filter(r => tab === 'all' || (tab === 'analysed' ? r.ai_processed : !r.ai_processed))
+    .filter(r => !brand || r.brand_id === brand)
+    .filter(r => !search || r.brand_name?.toLowerCase().includes(search.toLowerCase()) || r.report_type?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-6 max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Reports</h1>
-          <p className="text-sm text-gray-400 mt-1">{total} AI-generated report{total !== 1 ? 's' : ''}</p>
-        </div>
-        {compareA && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-brand-50 dark:bg-brand-950/20 border border-brand-200 dark:border-brand-800 rounded-lg text-sm text-brand-700 dark:text-brand-400">
-            <CompareIcon className="w-4 h-4" />
-            Select a second report to compare
-            <button onClick={() => setCompareA(null)} className="ml-1 text-brand-400 hover:text-brand-600">✕</button>
-          </div>
-        )}
+    <div className="p-6 lg:p-8 max-w-6xl">
+      <PageHeader
+        eyebrow="Intelligence"
+        title="Reports"
+        subtitle={`${reports.length} report${reports.length !== 1 ? 's' : ''} across all clients`}
+        actions={
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => window.location.href = '/upload'}>
+            Upload report
+          </Button>
+        }
+      />
+
+      {/* Filters */}
+      <div className="flex items-center gap-4 mb-6 flex-wrap">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by brand or type…" className="w-60" />
+        <select value={brand} onChange={e => setBrand(e.target.value)}
+          className="text-sm rounded-xl px-4 py-2.5 outline-none"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: brand ? '#fff' : 'rgba(255,255,255,0.4)' }}>
+          <option value="">All brands</option>
+          {brands.map(b => <option key={b.id} value={b.id} style={{ background: '#0f0a2e' }}>{b.name}</option>)}
+        </select>
+        <Tabs tabs={[
+          { key: 'all',      label: 'All',      count: reports.length                             },
+          { key: 'analysed', label: 'Analysed', count: reports.filter(r => r.ai_processed).length },
+          { key: 'pending',  label: 'Pending',  count: reports.filter(r => !r.ai_processed).length },
+        ]} active={tab} onChange={setTab} />
       </div>
 
-      {reports.length === 0 ? (
-        <div className="card text-center py-16 border-dashed">
-          <FileBarChart className="w-10 h-10 mx-auto text-gray-300 mb-3" />
-          <p className="text-gray-500 font-medium">No reports yet</p>
-          <p className="text-sm text-gray-400 mt-1">Upload and analyze a report to see insights here</p>
-          <Link href="/upload" className="btn-primary mt-4 inline-flex">Upload a report</Link>
-        </div>
+      {/* Report list */}
+      {loading ? (
+        <div className="flex items-center justify-center h-48"><Loader2 className="w-8 h-8 text-purple-400 animate-spin" /></div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={<FileText className="w-8 h-8" />}
+          title={search || brand ? 'No reports match those filters' : 'No reports yet'}
+          description="Upload a PDF report and ARIA will extract and analyse the data automatically."
+          action={!search && !brand ? <Button icon={<Plus className="w-4 h-4" />} onClick={() => window.location.href = '/upload'}>Upload first report</Button> : undefined}
+        />
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {reports.map((r) => (
-            <div
-              key={r.id}
-              className={clsx(
-                'card p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-md',
-                compareA === r.id && 'ring-2 ring-brand-500'
-              )}
-            >
-              {/* Direction + period */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
-                    {r.period_label || 'Unknown period'}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
-                  </p>
+        <div className="space-y-2">
+          {filtered.map(r => {
+            const status = statusOf(r);
+            return (
+              <div key={r.id}
+                className="flex items-center gap-4 p-4 rounded-xl border transition-all hover:border-purple-500/20 group"
+                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
+
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: r.ai_processed ? 'rgba(109,40,217,0.15)' : 'rgba(255,255,255,0.06)' }}>
+                  {r.ai_processed
+                    ? <Zap className="w-5 h-5 text-purple-400" />
+                    : <FileText className="w-5 h-5 text-white/30" />}
                 </div>
-                <DirectionIcon d={r.direction} />
-              </div>
 
-              {/* Strategic focus */}
-              {r.strategic_focus && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 italic">
-                  "{r.strategic_focus}"
-                </p>
-              )}
-
-              {/* Metadata */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="badge-neutral">{r.file_count} file{r.file_count !== 1 ? 's' : ''}</span>
-                {r.direction && (
-                  <span className={clsx(
-                    r.direction === 'growing' ? 'badge-success' :
-                    r.direction === 'declining' ? 'badge-danger' : 'badge-neutral'
-                  )}>
-                    {r.direction}
-                  </span>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 mt-auto pt-2 border-t border-gray-50 dark:border-gray-800">
-                <Link
-                  href={`/reports/${r.id}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors"
-                >
-                  View report <ChevronRight className="w-3 h-3" />
-                </Link>
-                <button
-                  onClick={() => handleCompareSelect(r.id)}
-                  className={clsx(
-                    'p-2 rounded-lg text-xs transition-colors',
-                    compareA === r.id
-                      ? 'bg-brand-100 dark:bg-brand-900/30 text-brand-600'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-brand-500'
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-bold text-white/80">{r.brand_name || 'Unknown brand'}</p>
+                    <Badge variant="purple">{TYPE_LABELS[r.report_type] || r.report_type || 'Report'}</Badge>
+                    <Badge variant={status.variant}>{status.label}</Badge>
+                  </div>
+                  <div className="flex items-center gap-4 mt-1">
+                    {r.report_period && (
+                      <div className="flex items-center gap-1 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                        <Calendar className="w-3 h-3" />{r.report_period}
+                      </div>
+                    )}
+                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                      Uploaded {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  {r.ai_processed && r.clarity_score && (
+                    <p className="text-[10px] text-purple-400 mt-0.5">ClarityScore™ {r.clarity_score}/1000</p>
                   )}
-                  title="Compare with another period"
-                >
-                  <CompareIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                </div>
 
-      {/* Pagination */}
-      {total > 20 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="btn-secondary disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-gray-500">Page {page}</span>
-          <button
-            onClick={() => setPage((p) => p + 1)}
-            disabled={page * 20 >= total}
-            className="btn-secondary disabled:opacity-40"
-          >
-            Next
-          </button>
+                {/* Actions */}
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <a href={`/reports/${r.id}`}
+                    className="p-2 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors" title="View report">
+                    <Eye className="w-4 h-4" />
+                  </a>
+                  <button onClick={() => downloadPDF(r)} disabled={downloading === r.id}
+                    className="p-2 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors" title="Download PDF">
+                    {downloading === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,5 +1,7 @@
 'use client';
-import { FileRowSkeleton } from '../../components/ui/Skeletons';
+
+import { FileRowSkeleton } from "@/components/ui/Skeletons";
+
 export default function Loading() {
   return (
     <div className="p-6 max-w-4xl space-y-6">

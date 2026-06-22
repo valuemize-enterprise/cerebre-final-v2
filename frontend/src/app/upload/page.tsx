@@ -1,275 +1,193 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { FileUpload } from '../../components/upload/FileUpload';
-import { uploadApi, reportsApi } from '../../lib/api';
-import { useAuthStore } from '../../lib/store';
-import { useSocket } from '../../hooks/useSocket';
-import { useBatchPolling } from '../../hooks/usePolling';
-import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
-import {
-  FileText, Image, Loader2, CheckCircle2, AlertCircle,
-  Clock, BarChart2, Trash2, Play, RefreshCw,
-} from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
+import { Upload, FileText, X, CheckCircle2, Loader2, Sparkles, AlertCircle, Building2 } from 'lucide-react';
+import { PageHeader, Card, Button, Select, Badge, Callout, TOKENS } from '@/components';
+import axios from 'axios';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
 import clsx from 'clsx';
-import { formatDistanceToNow } from 'date-fns';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  uploaded:   { label: 'Queued',      color: 'badge-neutral', icon: Clock },
-  processing: { label: 'Extracting',  color: 'badge-warning', icon: Loader2 },
-  extracted:  { label: 'Extracted',   color: 'badge-info',    icon: CheckCircle2 },
-  analyzed:   { label: 'Analyzed',    color: 'badge-success', icon: CheckCircle2 },
-  failed:     { label: 'Failed',      color: 'badge-danger',  icon: AlertCircle },
+const API  = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const hdrs = () => {
+  const token = typeof window !== "undefined" ? localStorage.getItem('sabi_token') : null;
+  return { Authorization: `Bearer ${token}` };
 };
 
-export default function UploadPage() {
-  const { token } = useAuthStore();
-  const [files, setFiles] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState<Record<string, number>>({});
+const REPORT_TYPES = [
+  { value: 'monthly',    label: 'Monthly performance report' },
+  { value: 'weekly',     label: 'Weekly update' },
+  { value: 'campaign',   label: 'Campaign report' },
+  { value: 'quarterly',  label: 'Quarterly review' },
+  { value: 'instagram',  label: 'Instagram Insights export' },
+  { value: 'facebook',   label: 'Facebook / Meta Analytics' },
+  { value: 'google_analytics', label: 'Google Analytics report' },
+  { value: 'tiktok',    label: 'TikTok Analytics' },
+  { value: 'twitter',    label: 'X / Twitter Analytics' },
+  { value: 'linkedin',   label: 'LinkedIn Analytics' },
+  { value: 'ad_account', label: 'Ad account report' },
+];
 
-  const loadFiles = useCallback(async () => {
-    try {
-      const { data } = await uploadApi.list(1);
-      setFiles(data.files || []);
-    } catch {
-      toast.error('Failed to load files');
-    } finally {
-      setLoading(false);
-    }
+interface UploadFile { file: File; status: 'pending'|'uploading'|'done'|'error'; progress: number; reportId?: string; error?: string; }
+
+export default function UploadPage() {
+  const [files, setFiles]     = useState<UploadFile[]>([]);
+  const [brandId, setBrandId] = useState('');
+  const [brands, setBrands]   = useState<any[]>([]);
+  const [reportType, setReportType] = useState('monthly');
+  const [dragging, setDragging] = useState(false);
+  const [brandsLoaded, setBrandsLoaded] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load brands on mount
+  useState(() => {
+    axios.get(`${API}/admin/brands`, { headers: hdrs() })
+      .then(r => { setBrands(r.data.brands || []); setBrandsLoaded(true); })
+      .catch(() => setBrandsLoaded(true));
+  });
+
+  const addFiles = useCallback((newFiles: File[]) => {
+    const pdfs = newFiles.filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+    if (pdfs.length !== newFiles.length) toast.error('Only PDF files are supported');
+    setFiles(prev => [...prev, ...pdfs.map(f => ({ file: f, status: 'pending' as const, progress: 0 }))]);
   }, []);
 
-  useEffect(() => { loadFiles(); }, [loadFiles]);
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    addFiles([...e.dataTransfer.files]);
+  };
 
-  // Real-time updates
-  useSocket({
-    token,
-    onFileProgress: ({ fileId, progress: p }) =>
-      setProgress((prev) => ({ ...prev, [fileId]: p })),
-    onFileExtracted: ({ fileId }) => {
-      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: 'extracted' } : f));
-    },
-    onFileFailed: ({ fileId }) => {
-      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: 'failed' } : f));
-    },
-    onAnalysisComplete: ({ fileId, reportId }) => {
-      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: 'analyzed', reportId } : f));
-      toast.success('Analysis complete — report ready!');
-    },
-  });
+  const removeFile = (i: number) => setFiles(f => f.filter((_, j) => j !== i));
 
-  const handleAnalyze = async (fileId: string) => {
-    try {
-      await reportsApi.analyze(fileId);
-      toast.success('AI analysis started');
-      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: 'processing' } : f));
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to start analysis');
+  const uploadAll = async () => {
+    if (!brandId) { toast.error('Select a client brand first'); return; }
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].status !== 'pending') continue;
+      setFiles(f => f.map((x, j) => j === i ? { ...x, status: 'uploading' } : x));
+      try {
+        const form = new FormData();
+        form.append('file', files[i].file);
+        form.append('brand_id', brandId);
+        form.append('report_type', reportType);
+        const { data } = await axios.post(`${API}/upload/report`, form, {
+          headers: { ...hdrs(), 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: e => {
+            const pct = Math.round(((e.loaded || 0) / (e.total || 1)) * 100);
+            setFiles(f => f.map((x, j) => j === i ? { ...x, progress: pct } : x));
+          },
+        });
+        setFiles(f => f.map((x, j) => j === i ? { ...x, status: 'done', reportId: data.reportId } : x));
+      } catch (err: any) {
+        setFiles(f => f.map((x, j) => j === i ? { ...x, status: 'error', error: err.response?.data?.error || 'Upload failed' } : x));
+      }
     }
   };
 
-  const handleRetry = async (fileId: string) => {
-    try {
-      await reportsApi.retry(fileId);
-      toast.success('File queued for retry');
-      setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, status: 'uploaded', error_message: undefined } : f));
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Retry failed');
-    }
-  };
-
-  const handleDelete = async (fileId: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
-    try {
-      await uploadApi.delete(fileId);
-      setFiles((prev) => prev.filter((f) => f.id !== fileId));
-      toast.success('File deleted');
-    } catch {
-      toast.error('Delete failed');
-    }
-  };
-
-  // Polling fallback for files not yet in terminal state (supplements WebSocket)
-  const pendingFileIds = files
-    .filter((f) => !['analyzed', 'failed'].includes(f.status))
-    .map((f) => f.id)
-    .filter(Boolean);
-
-  useBatchPolling(pendingFileIds, (fileId, statusData) => {
-    setFiles((prev) =>
-      prev.map((f) => f.id === fileId ? { ...f, status: statusData.status } : f)
-    );
-  });
+  const pendingCount = files.filter(f => f.status === 'pending').length;
+  const doneCount    = files.filter(f => f.status === 'done').length;
 
   return (
-    <ErrorBoundary>
-    <div className="p-6 max-w-4xl space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Upload reports</h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Drop in PDFs or screenshots from any platform — we'll extract, normalize, and analyze them automatically.
-        </p>
-      </div>
+    <div className="p-6 lg:p-8 max-w-3xl">
+      <PageHeader
+        eyebrow="Data Entry"
+        title="Upload Report"
+        subtitle="Upload PDF exports from any platform. ARIA reads and extracts all the numbers automatically."
+      />
 
-      {/* Supported platforms */}
-      <div className="card p-4">
-        <p className="section-title mb-3">Supported platforms</p>
-        <div className="flex flex-wrap gap-2">
-          {['Instagram', 'Facebook', 'Twitter/X', 'TikTok', 'YouTube', 'Google Ads', 'Website (GA4)', 'Email', 'LinkedIn'].map((p) => (
-            <span key={p} className="badge-neutral">{p}</span>
+      {/* Config bar */}
+      <Card className="mb-6">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Select
+            label="Client brand *"
+            options={brands.map(b => ({ value: b.id, label: b.name }))}
+            placeholder="Choose a brand…"
+            value={brandId} onChange={e => setBrandId(e.target.value)}
+          />
+          <Select
+            label="Report type"
+            options={REPORT_TYPES}
+            value={reportType} onChange={e => setReportType(e.target.value)}
+          />
+        </div>
+      </Card>
+
+      {/* Drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+        className={clsx('border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer transition-all duration-200 mb-6',
+          dragging ? 'scale-[1.01]' : 'hover:border-purple-500/50')}
+        style={{
+          minHeight: 200,
+          borderColor: dragging ? 'rgba(109,40,217,0.7)' : 'rgba(109,40,217,0.25)',
+          background:  dragging ? 'rgba(109,40,217,0.08)' : 'rgba(109,40,217,0.04)',
+        }}>
+        <input ref={inputRef} type="file" accept=".pdf,application/pdf" multiple className="hidden"
+          onChange={e => addFiles([...(e.target.files || [])])} />
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(109,40,217,0.15)' }}>
+          <Upload className="w-7 h-7 text-purple-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-base font-bold text-white mb-1">Drop PDF reports here</p>
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>or click to browse your computer · PDF only · Up to 50MB each</p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2">
+          {['Instagram Insights', 'Meta Analytics', 'Google Analytics', 'TikTok', 'LinkedIn'].map(s => (
+            <span key={s} className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(109,40,217,0.15)', color: 'rgba(167,139,250,0.8)' }}>{s}</span>
           ))}
         </div>
       </div>
 
-      {/* Drop zone */}
-      <div className="card p-6">
-        <FileUpload onUploadComplete={loadFiles} />
-      </div>
-
       {/* File list */}
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            Your files ({files.length})
-          </h2>
-          <button onClick={loadFiles} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <RefreshCw className="w-4 h-4" />
-          </button>
+      {files.length > 0 && (
+        <div className="space-y-2 mb-6">
+          {files.map((f, i) => (
+            <div key={i} className="flex items-center gap-3 p-4 rounded-xl border" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: f.status === 'done' ? 'rgba(5,150,105,0.15)' : f.status === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(109,40,217,0.15)' }}>
+                {f.status === 'done'      ? <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                : f.status === 'error'    ? <AlertCircle  className="w-5 h-5 text-red-400" />
+                : f.status === 'uploading'? <Loader2      className="w-5 h-5 text-purple-400 animate-spin" />
+                : <FileText className="w-5 h-5 text-purple-400" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{f.file.name}</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{(f.file.size / 1024 / 1024).toFixed(1)} MB</p>
+                  {f.status === 'uploading' && (
+                    <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', maxWidth: 120 }}>
+                      <div className="h-1 rounded-full transition-all" style={{ width: `${f.progress}%`, background: 'linear-gradient(90deg,#6d28d9,#a78bfa)' }} />
+                    </div>
+                  )}
+                  {f.status === 'done'  && <span className="text-xs text-emerald-400">✓ Uploaded — ARIA is analysing</span>}
+                  {f.status === 'error' && <span className="text-xs text-red-400">{f.error}</span>}
+                </div>
+              </div>
+              {f.status === 'pending' && (
+                <button onClick={() => removeFile(i)} className="p-1.5 rounded-lg text-white/20 hover:text-white/50 hover:bg-white/5">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              {f.reportId && (
+                <a href={`/reports/${f.reportId}`} className="text-xs text-purple-400 hover:underline">View report →</a>
+              )}
+            </div>
+          ))}
         </div>
+      )}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 text-brand-500 animate-spin" />
-          </div>
-        ) : files.length === 0 ? (
-          <div className="text-center py-14 text-gray-400">
-            <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No files yet. Upload your first report above.</p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-50 dark:divide-gray-800/60">
-            {files.map((file) => {
-              const cfg = STATUS_CONFIG[file.status] || STATUS_CONFIG.uploaded;
-              const Icon = cfg.icon;
-              const pct = progress[file.id];
-              const isImage = file.file_type?.startsWith('image/');
+      {doneCount > 0 && (
+        <Callout variant="success">
+          <strong>{doneCount} report{doneCount > 1 ? 's' : ''} uploaded.</strong>{' '}
+          ARIA is extracting metrics and generating analysis. The client's dashboard will update within a few minutes.
+        </Callout>
+      )}
 
-              return (
-                <li key={file.id} className="px-5 py-4">
-                  <div className="flex items-start gap-3">
-                    {/* File icon */}
-                    <div className={clsx(
-                      'mt-0.5 p-2 rounded-lg shrink-0',
-                      isImage ? 'bg-blue-50 dark:bg-blue-950/30' : 'bg-red-50 dark:bg-red-950/30'
-                    )}>
-                      {isImage
-                        ? <Image className="w-4 h-4 text-blue-500" />
-                        : <FileText className="w-4 h-4 text-red-500" />
-                      }
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                          {file.original_name}
-                        </p>
-                        <span className={cfg.color}>
-                          <Icon className={clsx('w-3 h-3 mr-1 inline',
-                            file.status === 'processing' && 'animate-spin'
-                          )} />
-                          {cfg.label}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                        <span>{((file.file_size || 0) / 1024 / 1024).toFixed(2)} MB</span>
-                        {file.platform_count > 0 && (
-                          <span>{file.platform_count} platform{file.platform_count > 1 ? 's' : ''} detected</span>
-                        )}
-                        <span>{formatDistanceToNow(new Date(file.uploaded_at), { addSuffix: true })}</span>
-                      </div>
-
-                      {/* Progress bar */}
-                      {pct !== undefined && pct < 100 && file.status === 'processing' && (
-                        <div className="mt-2 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden w-48">
-                          <div
-                            className="h-full bg-brand-500 rounded-full transition-all duration-500"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      )}
-
-                      {file.error_message && (
-                        <p className="mt-1 text-xs text-red-500">{file.error_message}</p>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {/* Retry failed */}
-                      {file.status === 'failed' && (
-                        <button
-                          onClick={() => handleRetry(file.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          Retry
-                        </button>
-                      )}
-
-                      {/* Analyze button */}
-                      {file.status === 'extracted' && (
-                        <button
-                          onClick={() => handleAnalyze(file.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors"
-                        >
-                          <Play className="w-3 h-3" />
-                          Analyze
-                        </button>
-                      )}
-
-                      {/* View report */}
-                      {file.status === 'analyzed' && file.report_count > 0 && (
-                        <Link
-                          href={`/reports?fileId=${file.id}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                        >
-                          <BarChart2 className="w-3 h-3" />
-                          View report
-                        </Link>
-                      )}
-
-                      {/* Re-analyze */}
-                      {file.status === 'analyzed' && (
-                        <button
-                          onClick={() => handleAnalyze(file.id)}
-                          className="p-1.5 text-gray-400 hover:text-brand-500 transition-colors"
-                          title="Re-analyze"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => handleDelete(file.id, file.original_name)}
-                        className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      {pendingCount > 0 && (
+        <Button full size="lg" icon={<Sparkles className="w-5 h-5" />} onClick={uploadAll}>
+          Upload {pendingCount} report{pendingCount > 1 ? 's' : ''} and analyse with ARIA
+        </Button>
+      )}
     </div>
-    </ErrorBoundary>
   );
 }
